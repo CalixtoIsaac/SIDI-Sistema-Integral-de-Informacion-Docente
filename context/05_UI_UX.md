@@ -55,7 +55,8 @@ Gráficas con Chart.js usando `--primary` para las barras y tonos neutros para e
 |⚪| Heidi Castro Díaz  | —         | —         | —         | Bach. Bilingüe| —         | 91 %  |   2   |
 +--+--------------------+-----------+-----------+-----------+-------------+-------------+-------+-------+
 ```
-- Campos vacíos se muestran con "—" (docentes creados desde OPINA hasta que llegue el Excel de maestros) y una etiqueta discreta **"Datos incompletos"**.
+- Campos vacíos se muestran con "—" y una etiqueta discreta **"Datos incompletos"** cuando faltan títulos, departamento o grupos del semestre (el Excel de maestros solo trae nómina, nombre, edad y CURP; lo demás se captura a mano). Clic en la etiqueta → abre la ficha en modo edición en el dato que falta.
+- La columna OPINA muestra la **calificación global** del docente (todas sus respuestas del periodo juntas).
 - OPINA con menos de 10 respuestas: valor en gris con tooltip "Muestra insuficiente (n respuestas)".
 - **Hover sobre el nombre** → resumen: Nómina `L03560330` · Contrato(s) · CRN del semestre.
 - **Clic en el nombre** → datos extendidos debajo, con pestañas:
@@ -63,13 +64,13 @@ Gráficas con Chart.js usando `--primary` para las barras y tonos neutros para e
   2. Trayectoria académica y profesional (títulos, nivel, departamento, tipo de contrato)
   3. Asignaturas y horarios (CRN, materia, tipo de clase, contrato, días y horas)
   4. Faltas, descuentos y suplencias que cubrió
-  5. OPINA (por periodo y por CRN; en 2026, desglose de los 5 reactivos; comentarios de alumnos)
+  5. OPINA: calificación global por periodo + % por cada grupo (CRN, materia, núm. de respuestas); en 2026, desglose de los 5 reactivos; comentarios de alumnos
 - Botón **Suspender / Reactivar** con confirmación.
 
 ## 3. Captura de docentes
 **Opción 1 – Formulario manual** en pasos: Datos personales → Laborales → Académicos → Asignaturas (CRN, materia, horas/semana, idioma, contrato) y horarios. La nómina acepta `3560330` o `L03560330` y muestra la forma normalizada.
 
-**Opción 2 – Subir Excel de maestros** (⏳ formato pendiente):
+**Opción 2 – Subir Excel de maestros** (nómina, nombre, edad, CURP):
 ```
 Paso 1: [ Arrastra aquí tu archivo Excel ]
 Paso 2: Confirma la información
@@ -77,6 +78,7 @@ Paso 2: Confirma la información
    1. José Félix Ramos
    ...
   ⚠️ 2 duplicados (se omitirán)   ❌ 1 con error (fila 17: CURP inválida)
+  ⚠️ 1 con edad que no coincide con la CURP (fila 23) → se agregará marcado para revisar
   ℹ️ Columnas no reconocidas: "Extensión" (se guardarán como datos adicionales)
 Paso 3: [Cancelar]  [Confirmar y agregar 48 maestros]
 ```
@@ -101,7 +103,7 @@ Total descontado: $3,950.74 · Pagado a suplentes: $1,563.00 · Diferencia: $2,3
 5. Por cada CRN/día: **¿Quién cubrió?** (opcional, buscador de docentes).
 6. Vista previa: *"Se registrarán 4 faltas · Descuento $263.00 · Se pagarán $263.00 a 4 suplentes"* → **Guardar**.
 
-Opción **"Descuento manual"** (casos especiales, p. ej. coach con 14 días de faltas): periodo en texto, jornada, horas en texto y monto capturado.
+Opción **"Descuento manual"** (casos especiales, p. ej. coach con 14 días de faltas): periodo en texto, **número de días**, horas en texto y monto capturado.
 
 ## 6. Incidencias (pagos de la quincena)
 ```
@@ -145,6 +147,7 @@ Además: inasistencias por semestre (número de faltas, profesores que faltaron,
 - Catálogos de Incidencias y Faltas (cc-nómina, motivos, CeCo, textos de situación/estatus).
 - Periodos (cuál es el actual) y quincenas (fecha de pago).
 - OPINA: muestra mínima y campus por defecto.
+- **Reportes**: ruta de la carpeta donde se guarda el archivo de Descuentos (la usa el vínculo externo de la hoja Detalle de Incidencias).
 - **Respaldo**: descargar `app.db` / restaurar.
 
 ## 10. Perfil

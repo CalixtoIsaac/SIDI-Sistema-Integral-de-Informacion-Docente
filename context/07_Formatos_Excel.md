@@ -1,6 +1,8 @@
 # Formatos Excel - SIDI
 Responsables: Matías Hernández (lectura/escritura) · Uziel García (mapeo a BD) · Validación: Saraí Cecilio (PO)
 
+> **Versión 2.1 (26/10/2026):** incorpora las respuestas del cliente (tarifa $54, 4 meses, jornada = días, vínculo externo de Detalle, fórmula OPINA, contenido del Excel de maestros).
+>
 > Este documento describe **cada archivo real** que entregó el cliente: qué columnas trae, cómo se interpreta y qué hace el sistema con él. Es la fuente de verdad para los lectores (importación) y los generadores (exportación).
 
 ## 0. Resumen
@@ -8,7 +10,7 @@ Responsables: Matías Hernández (lectura/escritura) · Uziel García (mapeo a B
 |---|---|---|---|---|---|
 | 1 | `DESCUENTO-PREPA Qnn.xlsx` | **Salida** (el sistema lo genera) | Quincenal | **No** (lo exige Nacional) | ✅ Recibido |
 | 2 | `INCIDENCIAS PREPA Qnn.xlsx` | **Salida** (el sistema lo genera) | Quincenal | **No** (lo exige Nacional) | ✅ Recibido |
-| 3 | Información de maestros | **Entrada** (se importa) | Al inicio del semestre / altas | — | ⏳ **Pendiente** |
+| 3 | Información de maestros | **Entrada** (se importa) | Al inicio del semestre / altas | — | ⏳ **Pendiente de recibir** (se espera: nómina, nombre, edad, CURP) |
 | — | `OPINA <periodo>.xlsx / .xlsb` | **Entrada** (se importa) | Semestral | No aplica (solo lectura) | ✅ Recibido (3 periodos) |
 | — | Tabla de pagos por tipo de clase | Catálogo inicial (`tipos_clase`) | Al cambiar tarifas | Editable en el sistema | ✅ Recibido |
 
@@ -46,7 +48,7 @@ Hoja única **`Descuentos`**. Encabezado en la fila 1, un registro por fila desd
 | A | Nomina (Sin L0) | `3560330` | `docentes.nomina` sin `L` ni ceros |
 | B | Contrato | `5568351` | `asignaturas.num_contrato` (**el contrato es por CRN**, no por docente) |
 | C | Nombre (Completo) | `Alessandro Bruno Cámpoli` | Nombres + apellidos |
-| D | Jornada de trabajo (turno que tenía en la fecha de la falta) | `1`, `14` | `faltas.jornada` ⚠️ ver pendientes |
+| D | Jornada de trabajo (turno que tenía en la fecha de la falta) | `1`, `14` | `faltas.dias` — **número de días** de la falta (confirmado). `1` en cada falta normal (una fila por día); en descuento manual, los días del rango (p. ej. `14`) |
 | E | Fecha de la falta (dd/mm/aaaa) (1 registro por cada falta) | `17/08/2026` | `faltas.fecha` (fecha real); en casos especiales texto `03/08/2026 al 16/08/2026` |
 | F | Motivo de falta (Falta/Suspensión) | `Falta por asunto personal` | `faltas.motivo` (catálogo) |
 | G | total de horas de la falta (8 h = 1 día; 4 h = ½ día) | `8 horas= 1 día completo` | `faltas.horas_texto` (catálogo) |
@@ -126,7 +128,14 @@ Sustituyó al docente {titular}, nómina: {L0nnnnnnn} CRN {crn} de {h} horas a l
 1. Se parte de una **plantilla vacía** guardada en `templates/` (copia del original sin datos). Nunca se crea el archivo desde cero.
 2. Solo se escriben valores en celdas; se conservan fuentes, anchos, formatos de número, el texto de A1 y el estilo de tabla.
 3. **`Tabla17` se redimensiona** al número de filas generadas. (En el archivo real la tabla llega a `A2:N36` pero hay datos hasta la fila 40: esas 4 filas quedaron fuera de la tabla por error manual.)
-4. **`Detalle` no usa vínculos externos.** El original toma la columna C de `[1]Descuentos!K…`, un vínculo a un archivo en SharePoint que se rompe al mover el archivo. SIDI escribe el **valor** en C y conserva fórmulas internas en D (`=Incidencia!M…`), E y totales. Mismo aspecto, sin vínculos rotos. ⚠️ Confirmar con el cliente que es aceptable.
+4. **`Detalle` conserva el vínculo externo** (confirmado: no se cambia hasta que Nacional lo autorice). Cómo está armado el original y qué hace SIDI:
+   - Columna C = fórmula a otro libro: `=[1]Descuentos!$K$2+[1]Descuentos!$K$3+…`, una referencia por cada fila del docente en el archivo de Descuentos. Columna D = fórmula interna `=Incidencia!M34+…`. E = `C − D` (en el original a veces viene `0` fijo). Fila `Total` con `SUM`.
+   - `[1]` es `xl/externalLinks/externalLink1.xml`, que apunta (en `_rels`) a `…/Documentos/NOMINA AD2026/DESCUENTO-PREPA Q16.xlsx` en el OneDrive/SharePoint de quien envía, y guarda una **copia en caché** de los valores de `K` para mostrarlos sin abrir el otro archivo (en el original la caché está incompleta: solo K2–K4).
+   - SIDI genera C con las referencias `[1]Descuentos!$K$n` a las filas **reales** del Descuentos que genera para esa misma quincena, **actualiza la ruta del vínculo** a `{ruta configurada}/DESCUENTO-PREPA%20Q{nn}.xlsx` y **llena la caché completa** con todos los montos, para que los totales se vean correctos aunque el vínculo no se actualice.
+   - La ruta base es configurable (`reportes.ruta_descuentos` en Configuración); por defecto la del original.
+   - `externalLink2.xml` (apunta a un `INCIDENCIAS PREPA-Q22.xlsx` y ninguna celda lo usa) es un residuo del archivo que se copió; se deja tal cual para no alterar la estructura.
+   - Implementación: **ExcelJS no conserva vínculos externos**, así que el Excel de Incidencias se genera editando el XML de la plantilla con JSZip (ver *03 §1*). Se elimina `calcChain.xml` y se marca `fullCalcOnLoad` para que Excel recalcule al abrir.
+   - Si en el futuro Nacional autoriza quitar el vínculo, basta con escribir valores en C (cambio pequeño en el generador).
 5. Nombre del archivo: `DESCUENTO-PREPA Q{nn}.xlsx` e `INCIDENCIAS PREPA Q{nn}.xlsx`.
 6. Prueba obligatoria: abrir el archivo generado en Excel de escritorio sin mensajes de reparación y compararlo lado a lado con el original de Q16 (los datos de Q16 sirven como caso de prueba de punta a punta).
 
@@ -161,12 +170,15 @@ Encuesta de alumnos. **Una fila = la evaluación de un alumno a un grupo (CRN).*
 Columnas ignoradas: `Flex`, `Flex Connect`, `SE`, `SEED`, `CAG`, `MAPS`, `count`, `Zona grupo`, `Campus alumno`, `Tipo de Periodo`, `Formato`, `Nivel`. (`Positiva`/`Negativa` se recalculan de `recomienda`.)
 
 ### 5.2 Cálculo de la calificación OPINA
-- **Calificación OPINA = % de recomendación = respuestas "Sí" ÷ total de respuestas × 100**, por docente y periodo (y también por CRN para la ficha).
+**Fórmula confirmada por el cliente:** porcentaje de recomendación = alumnos que responden "Sí" ÷ total de alumnos que respondieron × 100.
+- **Por grupo (CRN):** un profesor puede tener varios porcentajes porque imparte varias materias a varios grados. Se muestran en la ficha.
+- **Calificación global del docente en el periodo (la que calcula el programa):** se juntan **todas** sus respuestas de todos sus grupos: `Σ "Sí" ÷ Σ respuestas × 100`. Es un promedio **ponderado** por alumnos, no el promedio de los porcentajes de cada grupo. Ejemplo: grupo A 30/30 (100 %) y grupo B 5/10 (50 %) → global 35/40 = **87.5 %**, no 75 %.
+- La calificación global es la que aparece en la tabla de docentes, el panel y el ranking.
 - Referencia real: promedio general ≈ 88 % en los tres periodos; mediana por docente ≈ 91–93 %.
-- **Muestra mínima:** docentes con menos de 10 respuestas aparecen con la etiqueta "muestra insuficiente" y fuera del ranking (hay casos con 1 respuesta y 0 % o 100 %). Valor configurable.
-- **Filtro de campus:** por defecto solo grupos con `Campus grupo = Veracruz`. ENE-MAY 25 trae 206 respuestas de *Tecmilenio Online* y grupos de otros campus que inflan la lista a 77 profesores. Configurable al importar.
+- **Muestra mínima (propuesta del equipo):** docentes con menos de 10 respuestas aparecen con la etiqueta "muestra insuficiente" y fuera del ranking (hay casos con 1 respuesta y 0 % o 100 %). Valor configurable.
+- **Filtro de campus (⏳ por confirmar):** por defecto solo grupos con `Campus grupo = Veracruz`. ENE-MAY 25 trae 206 respuestas de *Tecmilenio Online* y grupos de otros campus que inflan la lista a 77 profesores. Configurable al importar.
 - En v2 se muestran además los 5 reactivos (% Sí) como desglose en la ficha.
-- Se guardan las respuestas crudas, así si el cliente define otra fórmula solo se recalcula.
+- Se guardan las respuestas crudas, así cualquier ajuste de la fórmula solo recalcula.
 - Los comentarios de alumnos son sensibles: solo se muestran en la ficha del docente, nunca en el panel.
 
 ### 5.3 Flujo de importación
@@ -175,65 +187,58 @@ Subir archivo → SIDI detecta versión y periodo → vista previa (periodo, fil
 ---
 
 ## 6. Tabla de pagos por tipo de clase (catálogo `tipos_clase`)
-| Tipo de clase | Horas/semana | Idioma | Pago total al semestre | Pago por día |
+| Tipo de clase | Horas/semana | Idioma | Pago total al semestre (4 meses) | Pago por día |
 |---|---|---|---|---|
 | Clase de 5 hrs en español | 5 | ES | $11,760.00 | $90.00 |
 | Clase de 5 hrs en inglés | 5 | EN | $14,112.00 | $106.00 |
 | Clase de 4 hrs en español | 4 | ES | $9,408.00 | $70.00 |
 | Clase de 4 hrs en inglés | 4 | EN | $11,290.00 | $85.00 |
-| Clase de 3 hrs en español | 3 | ES | $7,056.00 | $53.00 ⚠️ |
+| Clase de 3 hrs en español | 3 | ES | $7,056.00 | **$54.00** |
 | Clase de 3 hrs en inglés | 3 | EN | $8,467.00 | $65.00 |
 | Clase de 1.5 hrs en español | 1.5 | ES | $3,528.00 | $26.00 |
 | Clase de 1.5 hrs en inglés | 1.5 | EN | $4,234.00 | $32.00 |
 
 - Se carga como semilla y **se edita desde la pantalla de Configuración** (sin tocar código). Cada falta guarda el monto del momento (si cambia la tarifa, las faltas pasadas no cambian).
 - `Pago total al semestre` también se usa en Incidencias: un taller se paga como una clase de 5 h en español ($11,760 en 9 periodos).
-- ⚠️ **Discrepancia:** la tabla dice $53 para 3 h en español, pero el Excel de descuentos real usa **$54**. Proporcionalmente ($7,056 × 90 / 11,760) da $54.00. Confirmar cuál es el correcto.
+- **Confirmado:** la tarifa de 3 h en español es **$54** (la tabla original decía $53 por error; el Excel real y el cálculo proporcional dan $54).
+- **Confirmado:** el "(4)" del encabezado original significa que el semestre se paga en **4 meses**.
 
 ---
 
-## 7. Información de maestros (entrada) — ⏳ PENDIENTE
-Cuando llegue se documenta aquí con el mismo nivel de detalle. Lo que ya sabemos que debe proveer (o que sale de los otros archivos):
+## 7. Información de maestros (entrada) — ⏳ archivo pendiente de recibir
+**Confirmado con el cliente:** el Excel muy probablemente traerá **solo** los maestros con su **nómina, nombre, edad y CURP**. El resto de la información la obtiene la coordinadora preguntando al docente, de su CV o de archivos separados → se **captura a mano** en SIDI.
 
-| Dato | ¿Ya lo tenemos de otro archivo? |
+| Dato | De dónde sale |
 |---|---|
-| Nómina, nombre | Sí (OPINA, Descuentos, Incidencias) |
-| CRN, materia, clave de grupo, plan (General/Bilingüe) | Sí (OPINA, por periodo) |
-| Número de contrato **por CRN** | Parcial (Descuentos) |
-| Tipo de contrato (`determinado`) | Parcial (Incidencias) |
-| **Horas a la semana e idioma por CRN** (para la tarifa) | **No** — indispensable para calcular descuentos |
-| CURP, fecha de nacimiento, títulos, departamento, horarios | **No** |
+| Nómina, nombre, CURP | **Excel de maestros** |
+| Edad | Excel de maestros (solo se usa para validar) |
+| **Fecha de nacimiento y cumpleaños** | **Se obtienen de la CURP** (posiciones 5–10 = `AAMMDD`; el carácter 17 indica el siglo: dígito → 1900, letra → 2000). Se compara con la edad del Excel y, si no cuadra, se marca para revisión |
+| CRN, materia, clave de grupo, plan (General/Bilingüe) de semestres pasados | OPINA |
+| CRN del semestre actual, horas/semana, idioma, contrato por CRN | **Captura manual** ("+ Agregar grupo") — indispensable para calcular descuentos |
+| Tipo de contrato | Incidencias / captura manual |
+| Títulos, departamento, horarios, trayectoria | **Captura manual** (CV / entrevista) |
 
-**Importante:** OPINA llega **al terminar** el semestre, así que no trae los CRN del semestre en curso (AGO-DIC 2026). Para registrar faltas de este semestre se necesitan sus grupos: vendrán del Excel de maestros o se capturan con "+ Agregar grupo" (CRN, materia, horas/semana, idioma, contrato).
-
-Mientras tanto: el importador de docentes se diseña genérico (mapeo de columnas por nombre + columnas no reconocidas a `datos_adicionales`), y los docentes pueden **pre-crearse desde OPINA** (nómina, nombre, CRN, materia) para empezar a probar.
+Consecuencias en el diseño:
+- El importador de maestros es sencillo (4 columnas); si trae columnas extra van a `datos_adicionales`.
+- Importar **actualiza** a los docentes que ya existían (creados desde OPINA) usando la nómina como llave.
+- La ficha del docente debe permitir editar todo cómodamente, y la tabla marca **"Datos incompletos"** a quien le falten títulos, departamento o grupos del semestre.
+- OPINA llega **al terminar** el semestre, así que tampoco trae los CRN del semestre en curso: la captura manual de grupos es el único camino para registrar faltas del semestre actual.
 
 ---
 
-## 8. Pendientes de confirmar con el cliente (Saraí)
-1. Tarifa de 3 h en español: ¿$53 o $54? 
-R: El descuento real es de $54
+## 8. Decisiones confirmadas con el cliente (26/10/2026)
+| # | Pregunta | Respuesta |
+|---|---|---|
+| 1 | Tarifa 3 h español | **$54** por día |
+| 2 | "(4)" en pago total al semestre | El semestre se paga en **4 meses** |
+| 3 | Columna D "Jornada de trabajo" | **Número de días** |
+| 6 | ¿Detalle con valores en lugar del vínculo externo? | **No** por ahora: se conserva el vínculo hasta que Nacional autorice el cambio (§4.3) |
+| 8 | Fórmula OPINA | % de recomendación (Sí ÷ total); por CRN y **global unificada** por docente (§5.2) |
+| 9 | Contenido del Excel de maestros | Nómina, nombre, edad y CURP; lo demás se captura a mano (§7) |
 
-2. Qué significa el "(4)" en "Pago total al semestre (4)". 
-R: El 4 significa que son 4 meses
-
-3. Columna D "Jornada de trabajo" de Descuentos: trae `1` y `14`; ¿es número de días, turno o jornada?
-R: Es numero de Dias
-
-4. ¿Las faltas **justificadas** (p. ej. viaje avisado con anticipación) se descuentan? En Q16 el viaje avisado **sí** se descontó y se pagó al suplente.
-R:
-
-5. ¿El monto al suplente siempre es igual al descontado? (En Q16 sí; la columna "Diferencia" sugiere que puede variar.)
-R:
-
-6. ¿Se acepta que la hoja `Detalle` lleve valores en lugar del vínculo externo a SharePoint?
-R: Para el alcance actual no, primero se tiene que confirmar a nacional y despues de eso se modificaria.
-
-7. Fecha "A partir de qué periodo" de las suplencias en Q16 dice `30/01/2026` y el resto `30/08/2026`: ¿error de captura?
-R:
-
-8. ¿La calificación OPINA oficial es el % de recomendación o usan otra fórmula/escala? ¿Se incluyen grupos en línea u otros campus?
-R: Es el Porcentaje de recomendacion (La suma de todos los alumnos que digan que si vs los que dicen que no / la cantidad todal de alumnos), un profesor puede tener diferentes porcentajes ya que puede impartir varias materias a varios grados, pero se pueden unificar en una sola Calificacion global (Eso es algo que debe de hacer el programa)
-
-9. El archivo de información de maestros.
-R: Confirmamos con el cliente que el Excel que nos dara muy probablemente solo contenga los maestros, su nomina, edad y curp, el resto de informacion la obtiene de preguntarles directamente, de su CV o de archivos separados
+## 9. Pendientes de confirmar con el cliente (Saraí)
+1. ¿Las faltas **justificadas** (p. ej. viaje avisado con anticipación) se descuentan? En Q16 el viaje avisado **sí** se descontó y se pagó al suplente.
+2. ¿El monto al suplente siempre es igual al descontado? (En Q16 sí; la columna "Diferencia" sugiere que puede variar.)
+3. Fecha "A partir de qué periodo" de las suplencias en Q16 dice `30/01/2026` y el resto `30/08/2026`: ¿error de captura?
+4. OPINA: ¿se incluyen los grupos en línea (*Tecmilenio Online*) y de otros campus, o solo Veracruz?
+5. Recibir el archivo real de información de maestros.

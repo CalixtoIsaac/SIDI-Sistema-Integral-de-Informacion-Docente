@@ -11,7 +11,8 @@ Navegador (public/: HTML + CSS + JS, módulos IIFE)
 Express (server.js) ── routes/ ── services/ ── lib/db.js ── SQLite (data/app.db)
                                       │
                                       ├── lib/excel/lectores/   (SheetJS: OPINA, maestros)
-                                      └── lib/excel/generadores/ (ExcelJS + templates/: Descuentos, Incidencias)
+                                      └── lib/excel/generadores/ (templates/: Descuentos con ExcelJS,
+                                                                  Incidencias con JSZip sobre el XML)
 ```
 
 Capas del backend:
@@ -19,6 +20,9 @@ Capas del backend:
 - **services/**: lógica de negocio (descuentos, suplencias, quincenas, cálculo OPINA, métricas).
 - **lib/db.js**: conexión única `better-sqlite3`, esquema y migraciones.
 - **lib/excel/**: lectores y generadores, uno por archivo.
+  - `descuentos.js`: carga la plantilla con ExcelJS y escribe las filas.
+  - `incidencias.js`: abre la plantilla con **JSZip** y edita el XML directamente, porque ExcelJS pierde los vínculos externos. Pasos: escribir filas en `sheet1.xml` (hoja *Incidencia*) y ajustar el `ref` de `table1.xml` (`Tabla17`); escribir *Detalle* en `sheet2.xml` con fórmulas `[1]Descuentos!$K$n`; actualizar el destino del vínculo en `externalLinks/_rels/externalLink1.xml.rels` y la caché de valores en `externalLink1.xml`; usar cadenas en línea (`inlineStr`) o agregarlas a `sharedStrings.xml`; borrar `calcChain.xml` (y su entrada en `[Content_Types].xml` y `workbook.xml.rels`) y poner `fullCalcOnLoad="1"`.
+  - Ambos generadores reciben los mismos datos de la quincena para que las filas de Descuentos y las referencias de Detalle coincidan.
 
 Sin sesiones: no hay `requireAuth`. El servidor escucha en `HOST` (por defecto `127.0.0.1`).
 
@@ -33,7 +37,7 @@ SIDI/
 │   ├── nomina.js              # normalizar / formatear nómina
 │   ├── quincena.js            # número de quincena, rango y fecha de pago
 │   └── excel/
-│       ├── lectores/          # opina.js (v1/v2), maestros.js (⏳)
+│       ├── lectores/          # opina.js (v1/v2), maestros.js (nómina, nombre, edad, CURP)
 │       └── generadores/       # descuentos.js, incidencias.js
 ├── services/                  # descuentoService.js, suplenciaService.js, opinaService.js, metricasService.js
 ├── routes/                    # docentes.js, faltas.js, incidencias.js, opina.js, reportes.js,

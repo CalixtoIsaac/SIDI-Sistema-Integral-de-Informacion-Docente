@@ -1,7 +1,9 @@
 # Requerimientos Técnicos - SIDI
 **Sistema Integral de Información Docente**
 
-> **Versión 2 (26/10/2026).** Incorpora los archivos del cliente: tabla de pagos por tipo de clase, OPINA (3 periodos), Descuentos e Incidencias (Q16). **Solo falta el Excel de información de maestros.** El detalle de cada archivo está en *07 - Formatos Excel*.
+> **Versión 2.1 (26/10/2026):** aplicadas las respuestas del cliente (tarifa $54, pago en 4 meses, jornada = días, se conserva el vínculo externo de Detalle, OPINA global ponderada, Excel de maestros = nómina/nombre/edad/CURP). Pendientes vigentes en *07 §9*.
+
+> Incorpora los archivos del cliente: tabla de pagos por tipo de clase, OPINA (3 periodos), Descuentos e Incidencias (Q16). **Solo falta recibir el Excel de información de maestros.** El detalle de cada archivo está en *07 - Formatos Excel*.
 
 ## 1. Propósito
 Sistema de información docente diseñado para centralizar y administrar los datos personales, académicos y laborales de los maestros, facilitando la consulta de perfiles, asignaturas, departamentos, horarios y trayectoria profesional desde una plataforma organizada.
@@ -32,7 +34,7 @@ Se usa la **plantilla Express + SQLite** que ya está en el repositorio (commit 
 | Estilos | Variables CSS en `theme.css` (claro/oscuro) | Permite cambiar color principal y modo en tiempo real |
 | Gráficas | Chart.js 4 (archivo local en `public/vendor/`) | Funciona sin internet, sin compilación |
 | Lectura de Excel | SheetJS (`xlsx`) | Lee `.xlsx` y `.xlsb` (OPINA viene en ambos) |
-| Generación de Excel | ExcelJS sobre plantillas | Rellena celdas conservando formato, tablas y fórmulas |
+| Generación de Excel | ExcelJS (Descuentos) · JSZip + edición del XML de la plantilla (Incidencias) | Descuentos es un formato simple; Incidencias tiene tabla de Excel y un **vínculo externo** que ExcelJS no conserva |
 | Subida de archivos | `multer` (en memoria, límite 15 MB) | |
 | Pruebas | `node:test` | Sin dependencias extra |
 | Control de versiones | Git + GitHub | Todo cambio por rama + PR aprobado por Isaac |
@@ -43,8 +45,8 @@ Se usa la **plantilla Express + SQLite** que ya está en el repositorio (commit 
 | ID | Requerimiento | Origen |
 |---|---|---|
 | RF-01 | Sistema de seguimiento para consultar rápido la información de cada maestro | EP-01 |
-| RF-02 | **Captura manual**: formulario con toda la información del docente | Captura (1) |
-| RF-03 | **Captura por Excel** (archivo de información de maestros ⏳): agrega varios docentes a la vez; antes muestra **cantidad y nombres** para confirmar | Captura (2) |
+| RF-02 | **Captura manual**: formulario con toda la información del docente. Es la vía principal para títulos, departamento, grupos (CRN, horas, idioma, contrato) y horarios, que la coordinadora obtiene del docente o de su CV | Captura (1) |
+| RF-03 | **Captura por Excel** (información de maestros: nómina, nombre, edad, CURP): agrega o actualiza varios docentes a la vez; antes muestra **cantidad y nombres** para confirmar. La fecha de nacimiento se obtiene de la CURP | Captura (2) |
 | RF-04 | Tabla con: nombre, CURP, fecha de nacimiento, cumpleaños, nivel (Bachillerato General / Bilingüe / Profesional), títulos, calificación OPINA del semestre y número de inasistencias | Tabla |
 | RF-05 | Hover sobre el nombre → resumen (Núm. de nómina, Contrato(s), CRN); clic → datos extendidos debajo de la tabla | Tabla |
 | RF-06 | Indicador activo/inactivo (punto verde = activo, gris = inactivo) | Estatus |
@@ -57,7 +59,7 @@ Se usa la **plantilla Express + SQLite** que ya está en el repositorio (commit 
 | RF-13 | Registrar **pagos adicionales** por quincena (tutoreo, PAD, coach, talleres, etc.) con importe total y número de periodos | Excel Incidencias |
 | RF-14 | Generar `DESCUENTO-PREPA Qnn.xlsx` **idéntico** al formato de Nacional | Excel Descuentos |
 | RF-15 | Generar `INCIDENCIAS PREPA Qnn.xlsx` (hojas *Incidencia* y *Detalle* con la conciliación descontado vs. pagado a suplentes) idéntico al formato de Nacional | Excel Incidencias |
-| RF-16 | Importar OPINA (`.xlsx`/`.xlsb`, versiones 2024–2026) y calcular la calificación por docente y periodo | OPINA |
+| RF-16 | Importar OPINA (`.xlsx`/`.xlsb`, versiones 2024–2026) y calcular el % de recomendación por grupo (CRN) y una **calificación global** por docente y periodo (todas sus respuestas juntas) | OPINA |
 | RF-17 | Ranking de maestros por mejor calificación OPINA | EP-05 |
 | RF-18 | Apartado de inasistencias por semestre: número de faltas, cuántos profesores faltaron y motivo | Inasistencias |
 | RF-19 | **Primera vista = panel administrativo** con gráficas (OPINA por maestro, inasistencias, docentes activos y métricas propuestas) | EP-04 |
@@ -71,7 +73,7 @@ Docentes activos/inactivos, faltas de la quincena y del semestre, profesores con
 ## 5. Requerimientos no funcionales
 - **RNF-01 Usabilidad:** usuaria sin conocimientos técnicos; todo en español, confirmaciones claras, máximo 2 clics para consultas frecuentes.
 - **RNF-02 Rendimiento:** búsquedas y filtros < 500 ms; importar un OPINA (~4,000 filas) < 10 s.
-- **RNF-03 Fidelidad de formatos:** los Excel generados deben abrirse en Excel sin mensajes de reparación y verse igual que los originales (ver *07 §4.3*).
+- **RNF-03 Fidelidad de formatos:** los Excel generados deben abrirse en Excel sin mensajes de reparación y verse igual que los originales, **incluido el vínculo externo** de la hoja Detalle (ver *07 §4.3*).
 - **RNF-04 Extensibilidad:** columnas desconocidas del Excel de maestros → `datos_adicionales` (JSON) sin rehacer la BD.
 - **RNF-05 Apariencia formal:** el color elegido solo afecta acentos (botones, menú activo, enlaces); fondos neutros; los colores de estado (verde/gris/rojo/ámbar) no cambian. Contraste mínimo WCAG AA (4.5:1).
 - **RNF-06 Responsivo:** escritorio y tableta.
@@ -86,8 +88,8 @@ El cliente confirmó que **no se requiere inicio de sesión**. Al abrir SIDI se 
 
 ## 7. Integración con Excel
 Resumen (detalle completo en *07 - Formatos Excel*):
-- **Entrada:** OPINA (semestral) y, cuando llegue, información de maestros.
-- **Salida:** Descuentos e Incidencias (quincenales). Los dos son **no modificables** porque así los pide Nacional: SIDI rellena una plantilla vacía y solo escribe valores.
+- **Entrada:** OPINA (semestral) e información de maestros (nómina, nombre, edad, CURP; archivo por recibir).
+- **Salida:** Descuentos e Incidencias (quincenales). Los dos son **no modificables** porque así los pide Nacional: SIDI rellena una plantilla vacía. La hoja Detalle de Incidencias conserva su fórmula con vínculo externo al archivo de Descuentos de la misma quincena.
 - La nómina se guarda normalizada (`L` + 8 dígitos) y cada formato la escribe como la pide.
 
 ## 8. Calidad
@@ -101,4 +103,6 @@ Resumen (detalle completo en *07 - Formatos Excel*):
 - **Solo Isaac acepta los cambios** (`main` y `develop` protegidas). Detalle en *Arquitectura y Convenciones - SIDI*.
 
 ## 10. Pendientes
-Ver *07 §8*. El principal: **Excel de información de maestros** (sin él no se conocen horas/semana e idioma por CRN, que determinan la tarifa).
+Ver *07 §9*: trato de faltas justificadas, monto de suplencias, fecha "a partir de" de suplencias, campus en OPINA y recibir el Excel de maestros. Decisiones ya confirmadas en *07 §8*.
+
+Nota: horas/semana e idioma por CRN (que definen la tarifa) **no vienen en ningún Excel**; se capturan a mano por grupo.

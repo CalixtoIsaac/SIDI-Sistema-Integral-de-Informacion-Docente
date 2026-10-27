@@ -1,7 +1,9 @@
 # Modelo de Datos - SIDI
 Responsable: Uziel Armando García Duarte · Motor: **SQLite** (`better-sqlite3`, archivo `data/app.db`)
 
-> **Versión 2 (26/10/2026).** Ajustado a los archivos reales (OPINA, Descuentos, Incidencias, tabla de pagos). Los datos personales/académicos del docente (CURP, títulos, horarios…) quedan provisionales hasta recibir el **Excel de información de maestros**; lo que no tenga columna va a `datos_adicionales`.
+> **Versión 2.1 (26/10/2026):** aplicadas las respuestas del cliente (tarifa $54, pago en 4 meses, jornada = días, se conserva el vínculo externo de Detalle, OPINA global ponderada, Excel de maestros = nómina/nombre/edad/CURP). Pendientes vigentes en *07 §9*.
+
+> Ajustado a los archivos reales (OPINA, Descuentos, Incidencias, tabla de pagos). El Excel de maestros solo traerá **nómina, nombre, edad y CURP**; títulos, departamento, grupos y horarios se capturan a mano. Columnas extra → `datos_adicionales`.
 
 ## 1. Diagrama entidad-relación (resumen)
 ```
@@ -30,7 +32,7 @@ departamentos 1──* docentes        catalogos (cc_nomina, motivos, CeCo, text
 | Dato | Tipo SQLite | Regla |
 |---|---|---|
 | Nómina | `TEXT` | Único; `^L\d{8}$` |
-| CURP | `TEXT` | Único si existe; 18 caracteres formato MX (nullable hasta tener el Excel de maestros) |
+| CURP | `TEXT` | Único si existe; 18 caracteres formato MX; de ella se deriva la fecha de nacimiento |
 | CRN | `TEXT` | Único por periodo |
 | Contrato | `TEXT` | 7 dígitos (se guarda texto para no perder ceros) |
 | CeCo / cuenta de cargo | `TEXT` | 10 dígitos |
@@ -47,7 +49,8 @@ CREATE TABLE IF NOT EXISTS configuracion (
   valor TEXT NOT NULL
 );
 -- semillas: tema.modo='automatico', tema.color='#DB2777', perfil.nombre='Coordinación de Docentes',
---           opina.muestra_minima='10', opina.campus='Veracruz'
+--           opina.muestra_minima='10', opina.campus='Veracruz',
+--           reportes.ruta_descuentos='<carpeta NOMINA AD2026 del original>' (vínculo externo de la hoja Detalle)
 
 -- ===== Catálogos =====
 CREATE TABLE IF NOT EXISTS departamentos (
@@ -115,8 +118,9 @@ CREATE TABLE IF NOT EXISTS docentes (
   nombres TEXT NOT NULL,
   apellido_paterno TEXT NOT NULL,
   apellido_materno TEXT,
-  curp TEXT UNIQUE,                               -- ⏳ Excel de maestros
-  fecha_nacimiento TEXT,                          -- ⏳
+  curp TEXT UNIQUE,                               -- Excel de maestros
+  fecha_nacimiento TEXT,                          -- derivada de la CURP (AAMMDD, posiciones 5–10); editable
+  edad_reportada INTEGER,                         -- edad del Excel de maestros; solo para validar contra la CURP
   nivel_educativo TEXT CHECK (nivel_educativo IN
     ('Bachillerato General','Bachillerato General Bilingüe','Profesional')),
   tipo_contrato TEXT DEFAULT 'determinado',
@@ -147,7 +151,7 @@ CREATE TABLE IF NOT EXISTS asignaturas (
   clave_materia TEXT,                             -- 'BSCN1006'
   materia TEXT NOT NULL,
   plan TEXT,                                      -- 'Bachillerato General' | '... Bilingüe'
-  tipo_clase_id INTEGER REFERENCES tipos_clase(id),  -- ⏳ del Excel de maestros; editable a mano
+  tipo_clase_id INTEGER REFERENCES tipos_clase(id),  -- captura manual (no viene en ningún Excel)
   num_contrato TEXT,                              -- contrato de ese CRN (Descuentos col. B)
   UNIQUE (crn, periodo_id)
 );
@@ -169,7 +173,7 @@ CREATE TABLE IF NOT EXISTS faltas (
   asignatura_id INTEGER REFERENCES asignaturas(id),  -- NULL solo en descuento manual sin CRN
   fecha TEXT,                                     -- día de la falta (NULL si es rango manual)
   fecha_texto TEXT,                               -- '03/08/2026 al 16/08/2026' (solo manual)
-  jornada INTEGER NOT NULL DEFAULT 1,             -- col. D ⚠️ significado por confirmar
+  dias INTEGER NOT NULL DEFAULT 1 CHECK (dias >= 1), -- col. D "Jornada de trabajo" = número de días (confirmado)
   motivo TEXT NOT NULL,                           -- catálogo motivo_falta
   horas_texto TEXT NOT NULL DEFAULT '8 horas= 1 día completo',
   cuenta_cargo TEXT NOT NULL DEFAULT '5420103000',
@@ -240,7 +244,17 @@ CREATE TABLE IF NOT EXISTS opina_respuestas (
   comentario TEXT
 );
 
--- Calificación por docente y periodo
+-- Calificación por grupo (un docente puede tener varias: distintas materias y grados)
+CREATE VIEW IF NOT EXISTS v_opina_crn AS
+SELECT periodo_id, docente_id, crn,
+       COUNT(*)                                AS respuestas,
+       SUM(recomienda)                         AS positivas,
+       ROUND(100.0 * SUM(recomienda) / COUNT(*), 1) AS porcentaje
+FROM opina_respuestas
+GROUP BY periodo_id, docente_id, crn;
+
+-- Calificación GLOBAL del docente en el periodo: todas sus respuestas juntas
+-- (ponderada por alumnos; NO es el promedio de los porcentajes de cada CRN)
 CREATE VIEW IF NOT EXISTS v_opina_docente AS
 SELECT periodo_id, docente_id,
        COUNT(*)                                AS respuestas,
@@ -267,7 +281,8 @@ quincena(fecha)      = (mes − 1) × 2 + (día ≤ 15 ? 1 : 2)
 
 -- Falta con modo 'tarifa' (una por CRN y día)
 tarifa_aplicada      = tipos_clase.pago_por_dia  del CRN
-monto_descuento      = justificada ? 0 : tarifa_aplicada       -- ⚠️ confirmar trato de justificadas
+monto_descuento      = justificada ? 0 : tarifa_aplicada       -- ⏳ trato de justificadas por confirmar (07 §9)
+dias                 = 1                                        -- manual: días del rango (p. ej. 14)
 comentario           = 'CRN {crn} de {horas} horas a la semana, a descontar {m} = {m}'
 
 -- Suplencia
@@ -284,17 +299,23 @@ pagado_suplentes     = Σ suplencias.monto de esas faltas
 diferencia           = descontado − pagado_suplentes
 
 -- OPINA
-calificacion         = 100 × Σ recomienda / respuestas         -- 'muestra insuficiente' si respuestas < muestra_minima
+calificacion_crn     = 100 × Σ recomienda / respuestas  del CRN
+calificacion_global  = 100 × Σ recomienda / Σ respuestas  de todos sus CRN del periodo
+                       -- 'muestra insuficiente' si respuestas < muestra_minima (propuesta del equipo)
+
+-- Docente (Excel de maestros)
+fecha_nacimiento     = CURP[5..10] como AAMMDD; siglo = CURP[17] dígito → 19xx, letra → 20xx
+edad_calculada       ≠ edad_reportada  → marcar "Revisar fecha de nacimiento"
 ```
 Una quincena `cerrada` no permite editar sus faltas ni incidencias (evita cambiar algo ya enviado a Nacional); se puede reabrir con confirmación.
 
 ## 6. Semillas (`lib/semillas.js`)
-- `tipos_clase`: las 8 filas de la tabla de pagos (*07 §6*).
+- `tipos_clase`: las 8 filas de la tabla de pagos (*07 §6*), con **$54** para 3 h en español.
 - `catalogos`: valores listados arriba.
 - `periodos`: AGO-DIC 2024, ENE-MAY 2025, ENE-MAY 2026, AGO-DIC 2026 (actual).
 - `quincenas`: las 24 del año en curso, con `fecha_pago` = día 15 / último día del mes (editable; Q16 2026 se paga el 30/08).
 - `configuracion`: valores por defecto del perfil y de OPINA.
 
 ## 7. Pendientes
-- Columnas del **Excel de información de maestros** → completar `docentes`, `titulos_docente`, `asignaturas.tipo_clase_id`, `horarios`.
-- Confirmar con el cliente los puntos de *07 §8* (tarifa $53/$54, columna Jornada, justificadas).
+- Recibir el Excel de maestros y confirmar los nombres exactos de sus columnas (nómina, nombre, edad, CURP).
+- Trato de faltas justificadas y monto de suplencias (*07 §9*).

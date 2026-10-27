@@ -26,7 +26,7 @@ Responsable: Matías Hernández Garrido (apoyo: Sebastián) · Base URL: `/api` 
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/health` | `{ status, timestamp }` (ya existe) |
-| GET | `/configuracion` | `{ configuracion: { "tema.modo": "automatico", "tema.color": "#DB2777", "perfil.nombre": "...", "opina.muestra_minima": "10", "opina.campus": "Veracruz" } }` |
+| GET | `/configuracion` | `{ configuracion: { "tema.modo": "automatico", "tema.color": "#DB2777", "perfil.nombre": "...", "opina.muestra_minima": "10", "opina.campus": "Veracruz", "reportes.ruta_descuentos": "https://…/NOMINA%20AD2026/" } }` |
 | PUT | `/configuracion` | Actualiza una o varias claves. Valida `tema.color` como hex con contraste suficiente y `tema.modo ∈ {claro, oscuro, automatico}` |
 | GET | `/respaldo` | Descarga una copia de `app.db` (`db.backup()`) |
 
@@ -47,7 +47,7 @@ Responsable: Matías Hernández Garrido (apoyo: Sebastián) · Base URL: `/api` 
 | GET | `/docentes` | Tabla. Query: `search` (nombre, CURP, nómina con o sin `L0`, CRN), `activo`, `semestreActual=true`, `nivel`, `titulo`, `ordenar` (`nombre`\|`edad`\|`titulos`\|`opina`), `page`, `limit`. Cada fila: nombre, CURP, nacimiento, cumpleaños, nivel, títulos, OPINA del periodo actual (% y respuestas), total de faltas, `incompleto` |
 | GET | `/docentes/:id` | Datos extendidos (títulos, asignaturas+horarios, departamento, faltas, suplencias cubiertas, OPINA por periodo) |
 | GET | `/docentes/:id/resumen` | Hover: nómina, contratos, CRN del semestre |
-| GET | `/docentes/:id/opina?periodoId=` | Detalle OPINA: por CRN, reactivos v2, comentarios |
+| GET | `/docentes/:id/opina?periodoId=` | Detalle OPINA: `global { respuestas, positivas, porcentaje }`, `porCrn [...]`, reactivos v2, comentarios |
 | POST | `/docentes` | Alta manual (la nómina se normaliza) |
 | PUT | `/docentes/:id` | Actualizar |
 | PATCH | `/docentes/:id/estatus` | `{ "activo": false }` suspender / reactivar |
@@ -59,14 +59,14 @@ Ejemplo `POST /docentes`:
 {
   "nomina": "3560330",
   "nombres": "Alessandro", "apellidoPaterno": "Bruno", "apellidoMaterno": "Cámpoli",
-  "curp": null, "fechaNacimiento": null,
+  "curp": "BUCA950312HVZRMLA4", "fechaNacimiento": null,   // si es null se deriva de la CURP
   "nivelEducativo": "Bachillerato General", "tipoContrato": "determinado",
   "asignaturas": [{ "periodoId": 4, "crn": "16434", "materia": "…", "tipoClaseId": 5, "numContrato": "5568351" }]
 }
 ```
 Respuesta `201`: `{ "docente": { "id": 12, "nomina": "L03560330", … } }`
 
-## Carga masiva de maestros (⏳ formato pendiente)
+## Carga masiva de maestros (nómina, nombre, edad, CURP)
 | Método | Ruta | Descripción |
 |---|---|---|
 | POST | `/docentes/excel/preview` | `multipart/form-data` (`archivo`). **No guarda**; devuelve cantidad y nombres |
@@ -77,6 +77,7 @@ Respuesta `201`: `{ "docente": { "id": 12, "nomina": "L03560330", … } }`
   "docentes": [{ "nombre": "José Félix Ramos", "nomina": "L00129481" }],
   "duplicados": [{ "fila": 9, "nomina": "..." }],
   "errores": [{ "fila": 17, "campo": "curp", "mensaje": "Formato inválido" }],
+  "revisar": [{ "fila": 23, "nomina": "L03109311", "mensaje": "La edad (31) no coincide con la CURP (29)" }],
   "columnasNoReconocidas": ["Extensión"] }
 ```
 Las vistas previas se guardan en memoria 30 minutos.
@@ -88,7 +89,7 @@ Las vistas previas se guardan en memoria 30 minutos.
 | POST | `/opina/confirm` | `{ previewId, reemplazar: true }` — inserta respuestas; crea docentes y asignaturas faltantes |
 | GET | `/opina/importaciones` | Historial de cargas |
 | DELETE | `/opina/importaciones/:id` | Elimina una carga y sus respuestas |
-| GET | `/opina/ranking?periodoId=&limit=&incluirMuestraInsuficiente=false` | Docentes ordenados por % de recomendación |
+| GET | `/opina/ranking?periodoId=&limit=&incluirMuestraInsuficiente=false` | Docentes ordenados por **calificación global** (Σ Sí ÷ Σ respuestas de todos sus CRN) |
 | GET | `/opina/comparativo?periodos=1,2,3` | % por docente en varios periodos |
 
 Respuesta de `/opina/preview`:
@@ -127,7 +128,7 @@ Ejemplo `POST /faltas`:
   "suplencias": [{ "asignaturaId": 102, "fecha": "2026-08-17", "docenteSuplenteId": 30 }]
 }
 ```
-Descuento manual: `"modo": "manual"`, `"fechaTexto": "03/08/2026 al 16/08/2026"`, `"jornada": 14`, `"horasTexto": "6 horas= 14 días"`, `"monto": 3183.74`, `"comentario": "6 horas a la semana, a descontar $3183.74"`.
+Descuento manual: `"modo": "manual"`, `"fechaTexto": "03/08/2026 al 16/08/2026"`, `"dias": 14`, `"horasTexto": "6 horas= 14 días"`, `"monto": 3183.74`, `"comentario": "6 horas a la semana, a descontar $3183.74"`.
 
 ## Incidencias (pagos adicionales)
 | Método | Ruta | Descripción |
@@ -144,7 +145,7 @@ Descuento manual: `"modo": "manual"`, `"fechaTexto": "03/08/2026 al 16/08/2026"`
 | GET | `/reportes/descuentos/validar?quincenaId=` | Avisos antes de generar (faltas sin CeCo, CRN sin tipo de clase…) |
 | GET | `/reportes/descuentos?quincenaId=` | Descarga `DESCUENTO-PREPA Qnn.xlsx` |
 | GET | `/reportes/incidencias/validar?quincenaId=` | Avisos (pagos sin contrato, PEP > 24 caracteres…) |
-| GET | `/reportes/incidencias?quincenaId=` | Descarga `INCIDENCIAS PREPA Qnn.xlsx` (hojas Incidencia + Detalle) |
+| GET | `/reportes/incidencias?quincenaId=` | Descarga `INCIDENCIAS PREPA Qnn.xlsx` (hojas Incidencia + Detalle; Detalle con vínculo externo a `DESCUENTO-PREPA Qnn.xlsx` en `reportes.ruta_descuentos`) |
 
 ## Analítica (panel)
 | Método | Ruta | Descripción |
