@@ -211,12 +211,29 @@ Mientras tanto: el importador de docentes se diseña genérico (mapeo de columna
 ---
 
 ## 8. Pendientes de confirmar con el cliente (Saraí)
-1. Tarifa de 3 h en español: ¿$53 o $54?
-2. Qué significa el "(4)" en "Pago total al semestre (4)".
+1. Tarifa de 3 h en español: ¿$53 o $54? 
+R: El descuento real es de $54
+
+2. Qué significa el "(4)" en "Pago total al semestre (4)". 
+R: El 4 significa que son 4 meses
+
 3. Columna D "Jornada de trabajo" de Descuentos: trae `1` y `14`; ¿es número de días, turno o jornada?
+R: Es numero de Dias
+
 4. ¿Las faltas **justificadas** (p. ej. viaje avisado con anticipación) se descuentan? En Q16 el viaje avisado **sí** se descontó y se pagó al suplente.
+R:
+
 5. ¿El monto al suplente siempre es igual al descontado? (En Q16 sí; la columna "Diferencia" sugiere que puede variar.)
+R:
+
 6. ¿Se acepta que la hoja `Detalle` lleve valores en lugar del vínculo externo a SharePoint?
+R: Para el alcance actual no, primero se tiene que confirmar a nacional y despues de eso se modificaria.
+
 7. Fecha "A partir de qué periodo" de las suplencias en Q16 dice `30/01/2026` y el resto `30/08/2026`: ¿error de captura?
+R:
+
 8. ¿La calificación OPINA oficial es el % de recomendación o usan otra fórmula/escala? ¿Se incluyen grupos en línea u otros campus?
+R: Es el Porcentaje de recomendacion (La suma de todos los alumnos que digan que si vs los que dicen que no / la cantidad todal de alumnos), un profesor puede tener diferentes porcentajes ya que puede impartir varias materias a varios grados, pero se pueden unificar en una sola Calificacion global (Eso es algo que debe de hacer el programa)
+
 9. El archivo de información de maestros.
+R: Confirmamos con el cliente que el Excel que nos dara muy probablemente solo contenga los maestros, su nomina, edad y curp, el resto de informacion la obtiene de preguntarles directamente, de su CV o de archivos separados
