@@ -1,5 +1,5 @@
 # Arquitectura y Convenciones - SIDI
-> **Versión 2 (26/10/2026).** Basada en la plantilla **Express + SQLite + JS sin frameworks** del repositorio, sin login.
+> **Versión 2.3 (27/10/2026).** Basada en la plantilla **Express + SQLite + JS sin frameworks** del repositorio, sin login. Agrega los lectores del **Excel de grupos** y de **CV en PDF**; el generador de Incidencias ya no maneja vínculos externos.
 
 ## 1. Arquitectura general
 Una sola aplicación Node que sirve la API y las páginas:
@@ -10,18 +10,21 @@ Navegador (public/: HTML + CSS + JS, módulos IIFE)
       ▼
 Express (server.js) ── routes/ ── services/ ── lib/db.js ── SQLite (data/app.db)
                                       │
-                                      ├── lib/excel/lectores/   (SheetJS: OPINA, maestros)
+                                      ├── lib/excel/lectores/   (SheetJS: OPINA, grupos docentes)
+                                      ├── lib/cv/               (pdf-parse: CV "A1 CURRICULUM VITAE DOCENTES")
                                       └── lib/excel/generadores/ (templates/: Descuentos con ExcelJS,
                                                                   Incidencias con JSZip sobre el XML)
 ```
 
 Capas del backend:
 - **routes/**: reciben la petición, validan entrada y responden. Sin SQL.
-- **services/**: lógica de negocio (descuentos, suplencias, quincenas, cálculo OPINA, métricas).
+- **services/**: lógica de negocio (descuentos, suplencias y su agrupación, quincenas de reporte, cálculo OPINA, perfil del docente, métricas).
 - **lib/db.js**: conexión única `better-sqlite3`, esquema y migraciones.
 - **lib/excel/**: lectores y generadores, uno por archivo.
   - `descuentos.js`: carga la plantilla con ExcelJS y escribe las filas.
-  - `incidencias.js`: abre la plantilla con **JSZip** y edita el XML directamente, porque ExcelJS pierde los vínculos externos. Pasos: escribir filas en `sheet1.xml` (hoja *Incidencia*) y ajustar el `ref` de `table1.xml` (`Tabla17`); escribir *Detalle* en `sheet2.xml` con fórmulas `[1]Descuentos!$K$n`; actualizar el destino del vínculo en `externalLinks/_rels/externalLink1.xml.rels` y la caché de valores en `externalLink1.xml`; usar cadenas en línea (`inlineStr`) o agregarlas a `sharedStrings.xml`; borrar `calcChain.xml` (y su entrada en `[Content_Types].xml` y `workbook.xml.rels`) y poner `fullCalcOnLoad="1"`.
+  - `incidencias.js`: abre la plantilla con **JSZip** y edita el XML directamente (conserva `Tabla17`, sus fórmulas `Tabla17[[#This Row],…]` y el estilo). Pasos: escribir filas en `sheet1.xml` (hoja *Incidencia*) y ajustar el `ref` de `table1.xml`; escribir *detalle* en `sheet2.xml` **con valores** en C (y fórmulas internas `=Incidencia!K{n}` en D, `=C−D` en E, `SUM` en el total); usar cadenas en línea (`inlineStr`) o agregarlas a `sharedStrings.xml`; borrar `calcChain.xml` (y su entrada en `[Content_Types].xml` y `workbook.xml.rels`) y poner `fullCalcOnLoad="1"`. La plantilla se guarda **sin** `externalLinks/` (se quitaron los residuos del original) para que Excel no pida "actualizar vínculos".
+- **lib/excel/lectores/grupos.js**: lee `GRUPOS_DOCENTES_<PERIODO>.xlsx` (hoja `Salida`), agrupa filas por CRN, arma sesiones (día + horas), calcula horas/semana e idioma sugerido y devuelve una vista previa (docentes y CRN nuevos/cambiados).
+- **lib/cv/lector.js**: extrae el texto de las primeras 3 páginas con `pdf-parse`, ubica las secciones por su número (`1.1`, `1.2.n`, `1.3.n`, `1.4`, `2.`…) y lee los campos `Etiqueta: valor`. Devuelve una **propuesta** (CURP, fecha, grados con estatus, lugar laboral, cursos, idiomas) con el nivel de confianza de cada dato. Nunca escribe en la BD por sí mismo.
   - Ambos generadores reciben los mismos datos de la quincena para que las filas de Descuentos y las referencias de Detalle coincidan.
 
 Sin sesiones: no hay `requireAuth`. El servidor escucha en `HOST` (por defecto `127.0.0.1`).
@@ -36,14 +39,18 @@ SIDI/
 │   ├── semillas.js            # tipos_clase, catálogos, quincenas del año
 │   ├── nomina.js              # normalizar / formatear nómina
 │   ├── quincena.js            # número de quincena, rango y fecha de pago
+│   ├── curp.js                # validar CURP, fecha de nacimiento, género
+│   ├── horario.js             # duración de sesión, horas/semana, idioma sugerido
+│   ├── cv/lector.js           # lector de CV en PDF (pdf-parse)
 │   └── excel/
-│       ├── lectores/          # opina.js (v1/v2), maestros.js (nómina, nombre, edad, CURP)
+│       ├── lectores/          # opina.js (v1/v2), grupos.js (Excel de grupos docentes)
 │       └── generadores/       # descuentos.js, incidencias.js
-├── services/                  # descuentoService.js, suplenciaService.js, opinaService.js, metricasService.js
+├── services/                  # descuentoService.js, suplenciaService.js, opinaService.js, metricasService.js,
+│                              # gruposService.js, cvService.js, perfilDocenteService.js
 ├── routes/                    # docentes.js, faltas.js, incidencias.js, opina.js, reportes.js,
 │                              # catalogos.js, configuracion.js, analitica.js
-├── templates/                 # PLANTILLAS VACÍAS: DESCUENTO-PREPA.xlsx, INCIDENCIAS-PREPA.xlsx
-├── data/                      # app.db (no se sube a git)
+├── templates/                 # PLANTILLAS VACÍAS: DESCUENTO-PREPA.xlsx, INCIDENCIAS-PREPA.xlsx (sin vínculos externos)
+├── data/                      # app.db y cv/*.pdf (NO se suben a git: .gitignore)
 ├── tests/                     # *.test.js con node:test + fixtures anonimizados
 ├── public/
 │   ├── app.html               # menú lateral + contenedor de vistas (página de inicio)
@@ -84,7 +91,7 @@ Se eliminan: `lib/auth.js`, `routes/auth.js`, `routes/notas.js`, `public/login.h
 - Todo dato del usuario que se pinta en HTML pasa por `UI.escape`.
 - SQL siempre con parámetros (`db.prepare(...).run(...)`); varias escrituras relacionadas van en `db.transaction()`.
 - Funciones de más de ~40 líneas se dividen. Prettier recomendado.
-- **Nunca** se suben a git archivos reales del cliente ni `data/*.db`. Los *fixtures* de prueba se anonimizan.
+- **Nunca** se suben a git archivos reales del cliente (Excel, **CV**), ni `data/*.db`, ni `data/cv/`. Los *fixtures* de prueba se anonimizan (para CV: un PDF de ejemplo con datos ficticios en el mismo formato).
 
 ## 5. Commits (Conventional Commits)
 ```
