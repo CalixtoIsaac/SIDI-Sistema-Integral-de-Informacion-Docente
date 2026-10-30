@@ -1,0 +1,26 @@
+name: Bug
+description: Error encontrado durante las pruebas
+title: "Bug · "
+labels: ["tipo:bug"]
+body:
+  - type: input
+    id: hu
+    attributes:
+      label: Historia relacionada
+      placeholder: "HU-12 (#14)"
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos para reproducir
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Qué se esperaba y qué pasó
+    validations:
+      required: true
+  - type: textarea
+    id: evidencia
+    attributes:
+      label: Evidencia (captura, consola). Sin datos reales del cliente.
