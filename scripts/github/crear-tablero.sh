@@ -17,14 +17,14 @@ PROJECT_TITLE="SIDI · Tablero Scrum"
 
 # Usuarios de GitHub del equipo (déjalos vacíos si aún no son colaboradores del repo;
 # en ese caso los issues se crean sin asignar).
-GH_UZIEL=""      # U · BD
-GH_MATIAS=""     # M · Backend
-GH_SEBASTIAN=""  # S · Frontend
+GH_UZIEL="Elreydelsubzero"      # U · BD
+GH_MATIAS="matt569"     # M · Backend
+GH_SEBASTIAN="sebashuesca"  # S · Frontend
 
 # Fecha de fin (due date) de cada milestone = último día hábil del sprint.
-SPRINT1_FIN="2026-11-09"
-SPRINT2_FIN="2026-11-17"
-SPRINT3_FIN="2026-11-24"
+SPRINT1_FIN="2026-11-06"
+SPRINT2_FIN="2026-11-13"
+SPRINT3_FIN="2026-11-20"
 
 CREAR_DEVELOP="si"   # crea la rama develop desde main y la deja como rama por defecto
 # ─────────────────────────────────────────────────────────────────────
