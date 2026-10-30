@@ -1,5 +1,7 @@
 # Arquitectura y Convenciones - SIDI
-> **Versión 2.3 (27/10/2026).** Basada en la plantilla **Express + SQLite + JS sin frameworks** del repositorio, sin login. Agrega los lectores del **Excel de grupos** y de **CV en PDF**; el generador de Incidencias ya no maneja vínculos externos.
+> **Versión 2.4 (29/10/2026).** Retroalimentación del cliente: lector del **reporte de contratos**, **envío de reportes por correo** (borrador `.eml` para Outlook institucional), **resumen ejecutivo** (visor de diapositivas e impresión a PDF), cálculo de **docentes disponibles** y comparativo OPINA del campus. Límite de OPINA a 30 MB.
+>
+> **Versión 2.3 (27/10/2026). Basada en la plantilla **Express + SQLite + JS sin frameworks** del repositorio, sin login. Agrega los lectores del **Excel de grupos** y de **CV en PDF**; el generador de Incidencias ya no maneja vínculos externos.
 
 ## 1. Arquitectura general
 Una sola aplicación Node que sirve la API y las páginas:
@@ -12,8 +14,9 @@ Express (server.js) ── routes/ ── services/ ── lib/db.js ── SQLi
                                       │
                                       ├── lib/excel/lectores/   (SheetJS: OPINA, grupos docentes)
                                       ├── lib/cv/               (pdf-parse: CV "A1 CURRICULUM VITAE DOCENTES")
-                                      └── lib/excel/generadores/ (templates/: Descuentos con ExcelJS,
-                                                                  Incidencias con JSZip sobre el XML)
+                                      ├── lib/excel/generadores/ (templates/: Descuentos con ExcelJS,
+                                      │                           Incidencias con JSZip sobre el XML; plantilla de contratos)
+                                      └── lib/correo/            (🆕 generador .eml borrador de Outlook)
 ```
 
 Capas del backend:
@@ -26,6 +29,11 @@ Capas del backend:
 - **lib/excel/lectores/grupos.js**: lee `GRUPOS_DOCENTES_<PERIODO>.xlsx` (hoja `Salida`), agrupa filas por CRN, arma sesiones (día + horas), calcula horas/semana e idioma sugerido y devuelve una vista previa (docentes y CRN nuevos/cambiados).
 - **lib/cv/lector.js**: extrae el texto de las primeras 3 páginas con `pdf-parse`, ubica las secciones por su número (`1.1`, `1.2.n`, `1.3.n`, `1.4`, `2.`…) y lee los campos `Etiqueta: valor`. Devuelve una **propuesta** (CURP, fecha, grados con estatus, lugar laboral, cursos, idiomas) con el nivel de confianza de cada dato. Nunca escribe en la BD por sí mismo.
   - Ambos generadores reciben los mismos datos de la quincena para que las filas de Descuentos y las referencias de Detalle coincidan.
+
+- 🆕 **lib/excel/lectores/contratos.js**: lee el reporte de contratos (plantilla de SIDI o archivo propio con columnas CRN/Contrato por alias) y devuelve una vista previa (*07 §7.3*).
+- 🆕 **lib/correo/eml.js**: arma un MIME `multipart/mixed` con los 2 Excel en base64, destinatarios, asunto y cuerpo, y `X-Unsent: 1` para que Outlook institucional lo abra como borrador (*07 §10*). Sin dependencias (no se usa Nodemailer ni SMTP). `reporteService.enviar()` genera los archivos y registra en `envios_correo`.
+- 🆕 **services/disponibilidadService.js**: dado un CRN, fecha y sesión, busca docentes activos sin empalme de horario (`inicio < fin' AND inicio' < fin` el mismo día de la semana) y los ordena (*04 §5*).
+- 🆕 **Resumen ejecutivo** (`public/js/resumen.js`): visor de diapositivas 16:9 con Chart.js; exporta con `window.print()` y CSS `@page { size: 13.333in 7.5in }`, una diapositiva por página; las gráficas se redibujan en modo claro antes de imprimir.
 
 Sin sesiones: no hay `requireAuth`. El servidor escucha en `HOST` (por defecto `127.0.0.1`).
 
@@ -42,11 +50,13 @@ SIDI/
 │   ├── curp.js                # validar CURP, fecha de nacimiento, género
 │   ├── horario.js             # duración de sesión, horas/semana, idioma sugerido
 │   ├── cv/lector.js           # lector de CV en PDF (pdf-parse)
+│   ├── correo/                # 🆕 eml.js (borrador de Outlook con adjuntos)
 │   └── excel/
-│       ├── lectores/          # opina.js (v1/v2), grupos.js (Excel de grupos docentes)
+│       ├── lectores/          # opina.js (v1/v2), grupos.js (Excel de grupos docentes), 🆕 contratos.js
 │       └── generadores/       # descuentos.js, incidencias.js
 ├── services/                  # descuentoService.js, suplenciaService.js, opinaService.js, metricasService.js,
-│                              # gruposService.js, cvService.js, perfilDocenteService.js
+│                              # gruposService.js, cvService.js, perfilDocenteService.js,
+│                              # 🆕 bajaService.js, disponibilidadService.js, contratosService.js, reporteService.js (envío)
 ├── routes/                    # docentes.js, faltas.js, incidencias.js, opina.js, reportes.js,
 │                              # catalogos.js, configuracion.js, analitica.js
 ├── templates/                 # PLANTILLAS VACÍAS: DESCUENTO-PREPA.xlsx, INCIDENCIAS-PREPA.xlsx (sin vínculos externos)
@@ -61,7 +71,7 @@ SIDI/
 │       ├── ui-kit.js          # UI.escape, UI.api, UI.toast, UI.confirm, UI.formModal…
 │       ├── app.js             # navegación entre vistas (VIEWS)
 │       ├── panel.js · docentes.js · faltas.js · incidencias.js
-│       ├── opina.js · reportes.js · catalogos.js · perfil.js
+│       ├── opina.js · reportes.js · catalogos.js · perfil.js · 🆕 resumen.js
 └── context/                   # estos documentos .md
 ```
 Se eliminan: `lib/auth.js`, `routes/auth.js`, `routes/notas.js`, `public/login.html`, `public/js/login.js`, `public/js/notas.js`, `public/css/login.css`.

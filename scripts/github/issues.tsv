@@ -1,0 +1,31 @@
+archivo	titulo	etiquetas	milestone	responsables	puntos	dia	fecha
+HU-00.md	HU-00 · Adaptar la plantilla (sin login, esquema v2.3 y semillas)	tipo:historia,prioridad:1,area:bd,area:backend	Sprint 1	U M	3	1	2026-11-03
+HU-02.md	HU-02 · Importar el Excel de grupos docentes	tipo:historia,EP-01,prioridad:1,area:backend,area:bd,area:frontend	Sprint 1	M U S	8	2	2026-11-04
+HU-08.md	HU-08 · Importar el archivo OPINA	tipo:historia,EP-05,prioridad:1,area:backend,area:bd	Sprint 1	M U	8	2	2026-11-04
+HU-01.md	HU-01 · Alta y edición de docentes con formulario	tipo:historia,EP-01,prioridad:1,area:bd,area:backend,area:frontend	Sprint 1	U M S	5	3	2026-11-05
+HU-20.md	HU-20 · Importar CV en PDF	tipo:historia,EP-01,prioridad:1,area:backend,area:bd,area:frontend	Sprint 1	M U S	8	3	2026-11-05
+HU-03.md	HU-03 · Tabla de docentes con los 12 campos	tipo:historia,EP-01,prioridad:1,area:frontend,area:backend	Sprint 1	S M	8	4	2026-11-06
+HU-04.md	HU-04 · Resumen al pasar el mouse y ficha extendida (tarifa mensual)	tipo:historia,EP-01,prioridad:2,area:frontend	Sprint 1	S	5	4	2026-11-06
+HU-05.md	HU-05 · Punto verde/gris y suspender docentes	tipo:historia,EP-03,prioridad:1,area:frontend,area:backend	Sprint 1	S M	3	4	2026-11-06
+HU-21.md	HU-21 · Baja con motivo, observaciones y recontratable	tipo:historia,EP-03,prioridad:1,area:bd,area:backend,area:frontend	Sprint 1	U M S	3	4	2026-11-06
+D05-cierre.md	D5 · Revisión del Sprint 1 con Saraí	tipo:tarea	Sprint 1	U M S	0	5	2026-11-09
+HU-06.md	HU-06 · Filtros y orden de docentes	tipo:historia,EP-03,prioridad:1,area:backend,area:frontend	Sprint 1	M S	5	5	2026-11-09
+HU-07.md	HU-07 · Búsqueda por nombre, CURP, nómina o CRN	tipo:historia,EP-01,prioridad:1,area:backend,area:frontend	Sprint 1	M S	3	5	2026-11-09
+HU-17.md	HU-17 · Color principal y modo claro/oscuro	tipo:historia,EP-07,prioridad:1,area:frontend	Sprint 1	S	5	5	2026-11-09
+HU-18.md	HU-18 · Editar tarifas y catálogos	tipo:historia,EP-02,prioridad:2,area:bd,area:frontend	Sprint 1	U S	3	5	2026-11-09
+HU-27.md	HU-27 · Importar el reporte de contratos por CRN	tipo:historia,EP-02,prioridad:1,area:backend,area:bd,area:frontend	Sprint 1	M U S	3	5	2026-11-09
+HU-09.md	HU-09 · Registrar faltas por día y CRN	tipo:historia,EP-02,prioridad:1,area:backend,area:bd,area:frontend	Sprint 2	M U S	8	6	2026-11-10
+HU-10.md	HU-10 · Suplencias y pago del suplente	tipo:historia,EP-06,prioridad:1,area:backend,area:frontend	Sprint 2	M S	5	6	2026-11-10
+HU-22.md	HU-22 · Grupos a suplir y docentes disponibles	tipo:historia,EP-02,prioridad:1,area:backend,area:frontend	Sprint 2	M S	5	6	2026-11-10
+HU-11.md	HU-11 · Pagos adicionales de la quincena	tipo:historia,EP-06,prioridad:1,area:backend,area:frontend	Sprint 2	M S	5	7	2026-11-11
+HU-12.md	HU-12 · Excel de Descuentos de la quincena	tipo:historia,EP-06,prioridad:1,area:backend,area:bd	Sprint 2	M U	5	7	2026-11-11
+HU-13.md	HU-13 · Excel de Incidencias con hoja Detalle	tipo:historia,EP-06,prioridad:1,area:backend,area:bd,area:frontend	Sprint 2	M U S	5	8	2026-11-12
+HU-14.md	HU-14 · Inasistencias por semestre	tipo:historia,EP-02,prioridad:2,area:backend,area:frontend	Sprint 2	M S	3	8	2026-11-12
+HU-15.md	HU-15 · Panel con gráficas	tipo:historia,EP-04,prioridad:2,area:frontend,area:backend	Sprint 2	S M	8	9	2026-11-13
+HU-16.md	HU-16 · Ranking completo OPINA con filtros y promedios	tipo:historia,EP-05,prioridad:2,area:bd,area:backend,area:frontend	Sprint 2	U M S	5	9	2026-11-13
+HU-19.md	HU-19 · Asignaturas y horarios del docente	tipo:historia,EP-01,prioridad:3,area:bd,area:frontend	Sprint 2	U S	2	9	2026-11-13
+D10-cierre.md	D10 · Cierre del Sprint 2: pruebas Q16–Q20 y entrega de reportes de Nacional	tipo:tarea	Sprint 2	U M S	0	10	2026-11-17
+HU-24.md	HU-24 · Comparativo del % OPP del campus	tipo:historia,EP-05,prioridad:2,area:bd,area:frontend	Sprint 3	U S	2	11	2026-11-18
+HU-25.md	HU-25 · Borrador de Outlook con los reportes de Nacional	tipo:historia,EP-06,prioridad:2,area:backend,area:frontend	Sprint 3	M S	3	12	2026-11-19
+HU-26.md	HU-26 · Resumen ejecutivo en diapositivas	tipo:historia,EP-04,prioridad:2,area:frontend,area:backend	Sprint 3	S M	8	13	2026-11-20
+D15-cierre.md	D15 · Cierre del Sprint 3: pruebas integrales y entrega final	tipo:tarea	Sprint 3	U M S	0	15	2026-11-24

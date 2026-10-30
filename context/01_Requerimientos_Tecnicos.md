@@ -1,6 +1,8 @@
 # Requerimientos Técnicos - SIDI
 **Sistema Integral de Información Docente**
 
+> **Versión 2.4 (29/10/2026): retroalimentación de la vista previa.** El cliente **aprobó el diseño** y las vistas (Panel, Docentes, Formación, Excel de grupos, Registrar falta, Incidencias, OPINA, Reportes). Nuevos requerimientos RF-24 a RF-29: tarifa mensual, baja con observaciones y recontratable, docentes disponibles para suplir, comparativo OPINA del campus, **envío de reportes por correo** y **resumen ejecutivo**. Los grupos de 4.5 h (en línea) se ignoran y la coordinadora creará el reporte de contratos (*07 §8 #19–#27*).
+>
 > **Versión 2.3 (27/10/2026):** pendientes con el cliente **cerrados** (*07 §8*). Nuevas entradas: **Excel de grupos docentes** y **CV en PDF**; 12 campos de consulta del docente; la hoja Detalle se genera **con valores** (sin vínculo externo).
 >
 > Versión 2.1 (26/10/2026): aplicadas las respuestas del cliente (tarifa $54, pago en 4 meses, jornada = días, se conserva el vínculo externo de Detalle, OPINA global ponderada, Excel de maestros = nómina/nombre/edad/CURP). Pendientes vigentes en *07 §9*.
@@ -37,8 +39,10 @@ Se usa la **plantilla Express + SQLite** que ya está en el repositorio (commit 
 | Gráficas | Chart.js 4 (archivo local en `public/vendor/`) | Funciona sin internet, sin compilación |
 | Lectura de Excel | SheetJS (`xlsx`) | Lee `.xlsx` y `.xlsb` (OPINA viene en ambos) y el Excel de grupos |
 | Lectura de CV (PDF) | `pdf-parse` (sobre pdf.js, sin binarios externos) | Los CV tienen texto seleccionable; solo se leen las primeras páginas (el formato "A1 CURRICULUM VITAE DOCENTES") |
+| Envío de correo 🆕 | Generación de `.eml` (borrador de Outlook con adjuntos), sin dependencias | La cuenta es Outlook institucional; no se guardan contraseñas ni se requiere TI (*07 §10*) |
+| Exportar resumen ejecutivo 🆕 | Impresión del navegador a PDF con CSS `@page` (16:9) | Sin dependencias; Chart.js ya está local |
 | Generación de Excel | ExcelJS (Descuentos) · JSZip + edición del XML de la plantilla (Incidencias) | Descuentos es un formato simple; Incidencias tiene una tabla de Excel (`Tabla17`) con fórmulas estructuradas que se conservan mejor editando el XML. Ya **no** hay vínculo externo |
-| Subida de archivos | `multer` (en memoria; 15 MB por Excel, 10 MB por PDF, hasta 60 PDF por carga) | |
+| Subida de archivos | `multer` (en memoria; 15 MB por Excel, 30 MB para OPINA, 10 MB por PDF, hasta 60 PDF por carga) | |
 | Pruebas | `node:test` | Sin dependencias extra |
 | Control de versiones | Git + GitHub | Todo cambio por rama + PR aprobado por Isaac |
 
@@ -49,12 +53,12 @@ Se usa la **plantilla Express + SQLite** que ya está en el repositorio (commit 
 |---|---|---|
 | RF-01 | Sistema de seguimiento para consultar rápido la información de cada maestro | EP-01 |
 | RF-02 | **Captura manual**: formulario con toda la información del docente; corrige o completa lo importado. Es la vía para **contrato por CRN**, campo de formación, primer semestre (si es anterior a los datos), actividades sin CRN y departamento | Captura (1) |
-| RF-03 | **Captura por Excel de grupos** (`GRUPOS_DOCENTES_<PERIODO>.xlsx`): agrega o actualiza docentes (nómina, nombre) y sus **grupos del semestre** (CRN, materia, grupo, modalidad, horario); calcula **horas/semana**, sugiere **idioma** y **tipo de clase**. Antes muestra **cantidad y nombres** para confirmar | Captura (2) |
+| RF-03 | **Captura por Excel de grupos** (`GRUPOS_DOCENTES_<PERIODO>.xlsx`, **mismo formato cada semestre** ✅): agrega o actualiza docentes (nómina, nombre) y sus **grupos del semestre** (CRN, materia, grupo, modalidad, horario); calcula **horas/semana**, sugiere **idioma** y **tipo de clase**; **omite los grupos de 4.5 h (en línea)**. Antes muestra **cantidad y nombres** para confirmar | Captura (2) |
 | RF-23 | **Captura por CV (PDF)**: sube varios CV a la vez; extrae CURP (→ fecha de nacimiento, edad y género), grados con su estatus (→ nivel de estudios y si está estudiando) y lugar laboral actual (→ trabajo independiente); vista previa editable, nada se guarda sin confirmar; el PDF se puede abrir desde la ficha | Captura (3) |
 | RF-04 | Tabla con los **12 campos de consulta** (*07 §7.2*): nombre, nómina, edad, género, CURP, número de grupos, grupos asignados, nivel de estudios, campo de formación, antigüedad, si está estudiando (y qué nivel), trabajo independiente a Tecmilenio; además cumpleaños, OPINA del semestre y número de inasistencias. Selector de columnas | Tabla · Nota del cliente |
 | RF-05 | Hover sobre el nombre → resumen (Núm. de nómina, Contrato(s), CRN); clic → datos extendidos debajo de la tabla | Tabla |
 | RF-06 | Indicador activo/inactivo (punto verde = activo, gris = inactivo) | Estatus |
-| RF-07 | Agregar maestros y **suspender** inactivos; filtrar a los que **dan clases el semestre actual** | EP-03 |
+| RF-07 | Agregar maestros y **suspender** inactivos; filtrar a los que **dan clases el semestre actual**. 🆕 Al suspender (dar de baja) se capturan **motivo, observaciones** y si es **recontratable** (*sin disponibilidad* → Recontratable; *no cumplió expectativas o tuvo problemas* → No recontratable); queda un historial de bajas | EP-03 · Retro 29/10 |
 | RF-08 | Filtros y orden: alfabético, edad, género, nivel de estudios, campo de formación, antigüedad, está estudiando, número de grupos, nivel que imparte, estatus | Filtros |
 | RF-09 | Búsqueda por nombre, CURP, número de nómina (con o sin `L0`) o CRN | Búsqueda |
 | RF-10 | Mostrar faltas totales por docente | Faltas |
@@ -64,12 +68,18 @@ Se usa la **plantilla Express + SQLite** que ya está en el repositorio (commit 
 | RF-14 | Generar `DESCUENTO-PREPA Qnn.xlsx` **idéntico** al formato de Nacional, con fila de total al final. Incluye todo lo **pendiente de reportar** hasta la fecha de corte | Excel Descuentos |
 | RF-15 | Generar `INCIDENCIAS PREPA Qnn.xlsx` (hojas *Incidencia* y *detalle* con la conciliación descontado vs. pagado a suplentes, **con valores**) idéntico al formato de Nacional | Excel Incidencias |
 | RF-16 | Importar OPINA (`.xlsx`/`.xlsb`, versiones 2024–2026; **solo grupos presenciales del campus Veracruz**) y calcular el % de recomendación por grupo (CRN) y una **calificación global** por docente y periodo (todas sus respuestas juntas) | OPINA |
-| RF-17 | Ranking de maestros por mejor calificación OPINA | EP-05 |
+| RF-17 | **Ranking completo** de maestros por calificación OPINA, con filtro de **mejores y peores** (Top/Bottom N o rango de %) y el **promedio de todos los maestros por semestre** | EP-05 · Retro 29/10 |
 | RF-18 | Apartado de inasistencias por semestre: número de faltas, cuántos profesores faltaron y motivo | Inasistencias |
 | RF-19 | **Primera vista = panel administrativo** con gráficas (OPINA por maestro, inasistencias, docentes activos y métricas propuestas) | EP-04 |
 | RF-20 | Catálogo editable de tarifas por tipo de clase y de los catálogos de Incidencias (cc-nómina, motivos, CeCo) | Tabla de pagos |
 | RF-21 | **Perfil**: elegir el **color principal** (rosa por defecto) y el **modo claro u oscuro**; se guarda y se aplica a todo el sistema | Cliente |
 | RF-22 | Consulta de asignaturas, departamentos, horarios (del Excel de grupos) y trayectoria profesional (del CV) | Descripción |
+| RF-24 🆕 | En la ficha del docente, **tarifa mensual** (pago al semestre ÷ 4) justo a la derecha de la tarifa diaria de cada CRN | Retro 29/10 |
+| RF-25 🆕 | Al registrar una falta, mostrar los **grupos que necesitarán suplirse** y proponer los **docentes disponibles** (activos, sin clase que se empalme con el horario de ese grupo ese día) | Retro 29/10 |
+| RF-26 🆕 | **Evolución por semestre del % OPP de Preparatoria Veracruz** (reporte institucional OPINA): captura de alumnos y opiniones positivas por semestre y gráfica de línea con el cambio (*07 §5.4*) | Retro 29/10 |
+| RF-27 🆕 | **Enviar los reportes de Nacional por correo** a destinatarios configurables (3 correos de Nacional) desde **Outlook institucional**: SIDI prepara el borrador con los 2 Excel adjuntos y ella presiona *Enviar*; bitácora (*07 §10*) | Retro 29/10 |
+| RF-28 🆕 | **Resumen ejecutivo** en el panel: presentación formal (diapositivas 16:9) con KPIs y gráficas de rendimiento por semestre, exportable a PDF; gráficas a elegir por el cliente (*05 §1.1*) | Retro 29/10 |
+| RF-29 🆕 | **Importar el reporte de contratos por CRN** (plantilla prellenada que genera SIDI; *07 §7.3*) | Retro 29/10 |
 
 ### Métricas propuestas para el panel (RF-19)
 Docentes activos/inactivos, faltas de la quincena y del semestre, profesores con faltas, **descuento total de la quincena**, **pagado a suplentes en la quincena**, promedio OPINA, ranking OPINA, distribución por nivel, faltas por motivo, próximos cumpleaños del mes.
@@ -91,6 +101,7 @@ El cliente confirmó que **no se requiere inicio de sesión**. Al abrir SIDI se 
 - **Datos personales mínimos:** del CV solo se guardan los campos que pide la coordinación (*07 §7.2*); domicilio, teléfono, RFC, estado civil y correo personal no se almacenan.
 - Se conservan de la plantilla: consultas SQL con parámetros, escape de HTML (`UI.escape`) y cabeceras de seguridad.
 - Respaldo: copiar `data/app.db` (botón "Descargar respaldo" en Configuración).
+- 🆕 **Observaciones de baja** (motivo de suspensión) son información sensible: solo se ven en la ficha del docente, nunca en el panel ni en el resumen ejecutivo (ahí solo conteos).
 
 ## 7. Integración con Excel
 Resumen (detalle completo en *07 - Formatos Excel*):
@@ -109,6 +120,6 @@ Resumen (detalle completo en *07 - Formatos Excel*):
 - **Solo Isaac acepta los cambios** (`main` y `develop` protegidas). Detalle en *Arquitectura y Convenciones - SIDI*.
 
 ## 10. Pendientes
-Todas las preguntas al cliente quedaron cerradas (*07 §8*). Surgieron 2 que no bloquean (*07 §9*): tarifa de los grupos de **4.5 h/semana** y si existe un reporte con el **contrato de cada CRN**.
+🆕 Respuestas del 29/10 (*07 §8 #28–#31*): correos de destino y **Outlook institucional** (borrador de Outlook), **2 tipos de falta** en el resumen ejecutivo, motivos de baja confirmados y **F61/F62 en línea** (se omiten).
 
-Nota: horas/semana salen del Excel de grupos y el idioma se sugiere; **el contrato por CRN no viene en ningún archivo** y se captura a mano (SIDI lo recuerda después de la primera vez).
+**Único pendiente:** el **reporte de contratos por CRN** — la coordinadora preguntó a **RH** si existe (*07 §9 #5*). Si existe, se importa; si no, se usa la plantilla de SIDI; mientras tanto el contrato se captura al registrar la primera falta de cada CRN.

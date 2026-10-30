@@ -1,6 +1,8 @@
 # Especificación de API - SIDI
 Responsable: Matías Hernández Garrido (apoyo: Sebastián) · Base URL: `/api` · JSON
 
+> **Versión 2.4 (29/10/2026): retroalimentación de la vista previa.** Baja con observaciones y recontratable, docentes disponibles para suplir, ranking con filtros y promedio, comparativo del campus, contratos por CRN, envío de reportes por correo y resumen ejecutivo. Límite de OPINA a 30 MB.
+>
 > **Versión 2.3 (27/10/2026).** Agrega importación del **Excel de grupos** y de **CV (PDF)**, los 12 campos de consulta en `/docentes`, contratos del suplente y faltas pendientes de reportar; se quita la ruta del vínculo externo.
 >
 > Versión 2 (26/10/2026): sin autenticación (no hay login): ninguna ruta lleva `Authorization`. Se sigue la convención de la plantilla para que `UI.api` funcione sin cambios.
@@ -19,7 +21,7 @@ Responsable: Matías Hernández Garrido (apoyo: Sebastián) · Base URL: `/api` 
 | 400 | Validación fallida |
 | 404 | No encontrado |
 | 409 | Nómina/CURP duplicada · falta repetida (mismo docente, CRN, día y sesión) |
-| 413 | Archivo demasiado grande (> 15 MB Excel, > 10 MB por PDF) |
+| 413 | Archivo demasiado grande (> 15 MB Excel, 🆕 > 30 MB OPINA, > 10 MB por PDF) |
 | 422 | Archivo no reconocido (columnas, versión o formato de CV desconocido) · contrato que no pertenece al suplente |
 | 423 | Quincena cerrada (no se puede modificar) |
 | 500 | Error interno |
@@ -35,7 +37,7 @@ Responsable: Matías Hernández Garrido (apoyo: Sebastián) · Base URL: `/api` 
 ## Catálogos
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET / PUT | `/tipos-clase`, `/tipos-clase/:id` | Tarifas (pago al semestre y por día) |
+| GET / PUT | `/tipos-clase`, `/tipos-clase/:id` | Tarifas (pago al semestre y por día; 🆕 `pagoMensual` calculado, solo lectura) |
 | GET | `/catalogos?tipo=cc_nomina` | Lista por tipo |
 | POST / PUT / DELETE | `/catalogos`, `/catalogos/:id` | Alta, edición, baja lógica (`activo = 0`) |
 | GET / PUT | `/periodos`, `/periodos/:id` | `PUT { actual: true }` marca el semestre actual |
@@ -46,8 +48,8 @@ Responsable: Matías Hernández Garrido (apoyo: Sebastián) · Base URL: `/api` 
 ## Docentes
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/docentes` | Tabla. Query: `search` (nombre, CURP, nómina con o sin `L0`, CRN), `activo`, `semestreActual=true`, `genero` (`M`\|`F`), `nivelEstudios`, `campo`, `estudiando` (`true`\|`false`), `antiguedadMin`/`antiguedadMax` (semestres), `gruposMin`/`gruposMax`, `nivelImparte`, `ordenar` (`nombre`\|`edad`\|`antiguedad`\|`grupos`\|`nivelEstudios`\|`opina`), `page`, `limit`. Cada fila trae los **12 campos de consulta** (*07 §7.2*): `nombre, nomina, edad, genero, curp, numGrupos, grupos[{crn,materia}], nivelEstudios, campoFormacion, antiguedad{anios,semestres,desde}, estudiando{si,nivel}, trabajoExterno` + `cumpleanos, opina{porcentaje,respuestas}, faltas, incompleto[]` |
-| GET | `/docentes/:id` | Datos extendidos (títulos, asignaturas+horarios, departamento, faltas, suplencias cubiertas, OPINA por periodo) |
+| GET | `/docentes` | Tabla. Query: `search` (nombre, CURP, nómina con o sin `L0`, CRN), `activo`, `semestreActual=true`, `genero` (`M`\|`F`), `nivelEstudios`, `campo`, `estudiando` (`true`\|`false`), `antiguedadMin`/`antiguedadMax` (semestres), `gruposMin`/`gruposMax`, `nivelImparte`, 🆕 `recontratable` (`true`\|`false`), `ordenar` (`nombre`\|`edad`\|`antiguedad`\|`grupos`\|`nivelEstudios`\|`opina`), `page`, `limit`. Cada fila trae los **12 campos de consulta** (*07 §7.2*): `nombre, nomina, edad, genero, curp, numGrupos, grupos[{crn,materia}], nivelEstudios, campoFormacion, antiguedad{anios,semestres,desde}, estudiando{si,nivel}, trabajoExterno` + `cumpleanos, opina{porcentaje,respuestas}, faltas, incompleto[]` |
+| GET | `/docentes/:id` | Datos extendidos (títulos, asignaturas+horarios con 🆕 `tarifaDiaria` y `tarifaMensual` por CRN y `totalMensual`, departamento, faltas, suplencias cubiertas, OPINA por periodo, 🆕 `bajas`, `recontratable`) |
 | GET | `/docentes/:id/resumen` | Hover: nómina, contratos, CRN del semestre |
 | GET | `/docentes/:id/contratos?periodoId=` | Contratos del docente (de sus asignaturas) → lista para el contrato del suplente |
 | GET | `/docentes/:id/cv` | Descarga el PDF del CV (`application/pdf`) · `404` si no tiene |
@@ -56,7 +58,8 @@ Responsable: Matías Hernández Garrido (apoyo: Sebastián) · Base URL: `/api` 
 | GET | `/docentes/:id/opina?periodoId=` | Detalle OPINA: `global { respuestas, positivas, porcentaje }`, `porCrn [...]`, reactivos v2, comentarios |
 | POST | `/docentes` | Alta manual (la nómina se normaliza) |
 | PUT | `/docentes/:id` | Actualizar |
-| PATCH | `/docentes/:id/estatus` | `{ "activo": false }` suspender / reactivar |
+| PATCH | `/docentes/:id/estatus` | 🆕 Suspender: `{ "activo": false, "motivo": "Sin disponibilidad de horario", "observaciones": "…", "recontratable": true }` (motivo, observaciones y recontratable **obligatorios** → `400`). Reactivar: `{ "activo": true, "confirmarNoRecontratable": true }` (si la última baja es no recontratable y falta la confirmación → `409`) |
+| GET | `/docentes/:id/bajas` | 🆕 Historial de bajas `[{ fecha, periodo, motivo, observaciones, recontratable, fechaReactivacion }]` |
 | POST | `/docentes/:id/asignaturas` | Agregar grupo o actividad: `{ periodoId, crn \| nombreActividad, materia, numeroGrupo, modalidad, idioma, tipoClaseId, numContrato, horarios: [{ dia, inicio, fin }] }` (si no se manda `tipoClaseId` se calcula de horario + idioma) |
 | PUT / DELETE | `/asignaturas/:id` | Editar (contrato, idioma, tipo de clase; quedan marcados como editados a mano) / eliminar |
 
@@ -80,6 +83,15 @@ Respuesta `201`: `{ "docente": { "id": 12, "nomina": "L03500001", "genero": "F",
 | POST | `/grupos/excel/preview` | `multipart/form-data` (`archivo`). Detecta periodo; **no guarda**; devuelve docentes y CRN nuevos/cambiados |
 | POST | `/grupos/excel/confirm` | `{ "previewId": "...", "inactivarAusentes": false }` — agrega/actualiza en una transacción; no pisa campos editados a mano |
 | GET | `/grupos/importaciones` | Historial |
+
+🆕 La vista previa agrega `"omitidos": [{ "crn": "22023", "grupo": "F61", "motivo": "En línea" }]` (grupos F61 y F62) y `"noRecontratables": [{ "nomina": "…", "nombre": "…" }]`; `sinTarifa` ya no incluye los CRN omitidos.
+
+## Contratos por CRN 🆕 (*07 §7.3*)
+| Método | Ruta | Descripción |
+|---|---|---|
+| GET | `/contratos/plantilla?periodoId=` | Descarga `CONTRATOS_<PERIODO>.xlsx` prellenado (CRN, materia, grupo, nómina, docente; Contrato vacío o con el valor actual) |
+| POST | `/contratos/preview` | `multipart` (`archivo`). Detecta columnas CRN/Contrato/Nómina por alias; **no guarda**. Devuelve `{ previewId, filas, nuevos, cambian: [{crn, antes, despues}], sinContrato, avisos: [{crn, tipo: 'CRN_NO_EXISTE'|'NOMINA_NO_CORRESPONDE'|'CONTRATO_INVALIDO'}] }` |
+| POST | `/contratos/confirm` | `{ previewId, conservarManual: [crn…] }` — actualiza `asignaturas.num_contrato` en una transacción |
 
 ```json
 { "previewId": "c42e...", "periodo": "AGO-DIC 2026", "filas": 152, "crn": 147,
@@ -110,12 +122,15 @@ Las vistas previas se guardan en memoria 30 minutos.
 ## OPINA
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST | `/opina/preview` | `multipart` (`archivo` .xlsx/.xlsb). Detecta versión y periodo; filtra **presencial + Veracruz**; **no guarda** |
+| POST | `/opina/preview` | `multipart` (`archivo` .xlsx/.xlsb, hasta 30 MB). Detecta versión y periodo; filtra **presencial + Veracruz**; **no guarda** |
 | POST | `/opina/confirm` | `{ previewId, reemplazar: true }` — inserta respuestas; crea docentes y asignaturas faltantes |
 | GET | `/opina/importaciones` | Historial de cargas |
 | DELETE | `/opina/importaciones/:id` | Elimina una carga y sus respuestas |
-| GET | `/opina/ranking?periodoId=&limit=&incluirMuestraInsuficiente=false` | Docentes ordenados por **calificación global** (Σ Sí ÷ Σ respuestas de todos sus CRN) |
-| GET | `/opina/comparativo?periodos=1,2,3` | % por docente en varios periodos |
+| GET | `/opina/ranking?periodoId=&filtro=todos\|mejores\|peores\|rango&n=10&min=&max=&compararCon=&incluirMuestraInsuficiente=false` | 🆕 **Ranking completo** por calificación global (Σ Sí ÷ Σ respuestas de todos sus CRN) con filtro de mejores/peores/rango. Respuesta: `{ periodo, promedioMaestros, calificacionCampus, docentes, ranking: [{ posicion, docenteId, nombre, porcentaje, respuestas, variacion }] }` |
+| GET | `/opina/ranking/excel?…` | 🆕 Mismos parámetros, descarga `.xlsx` |
+| GET | `/opina/comparativo?periodos=1,2,3` | % por docente en varios periodos (tabla docente × semestre) |
+| GET | `/opina/campus` | 🆕 % OPP oficial de Preparatoria Veracruz por semestre: `[{ periodo, alumnos, positivas, opp, variacion, regionOpp? }]` (G1) + `promedioMaestros` y distribución de cada periodo si hay OPINA por alumno |
+| PUT | `/opina/campus/:periodoId` | 🆕 `{ alumnos, positivas, regionOpp?, fuente? }` captura/edita el dato del semestre (`positivas ≤ alumnos`, si no `400`) |
 
 Respuesta de `/opina/preview`:
 ```json
@@ -136,7 +151,18 @@ Respuesta de `/opina/preview`:
 | PUT | `/faltas/:id/suplencia` | `{ docenteSuplenteId, numContrato, monto }` asignar/cambiar quién cubrió (`numContrato` debe ser del suplente → `422`) |
 | DELETE | `/faltas/:id/suplencia` | Quitar suplencia |
 | GET | `/faltas/resumen-quincena?quincenaId=` | Descontado, pagado a suplentes y diferencia por docente (= hoja Detalle) |
-| GET | `/faltas/resumen-semestral?periodoId=` | Núm. de faltas, profesores que faltaron, desglose por motivo |
+| GET | `/faltas/resumen-semestral?periodoId=` | Núm. de faltas, profesores que faltaron, desglose por motivo y 🆕 por tipo de resumen (*Asunto personal* / *Incapacidad médica*) |
+| POST | `/faltas/disponibles` | 🆕 `{ docenteId, fechas: ["2026-08-17"], asignaturaIds: [101, 102] }` → **grupos a suplir** y **docentes disponibles** por sesión (sin empalme de horario, activos, sin falta ese día), ordenados por misma materia → da clases ese día → menos suplencias |
+
+Respuesta de `/faltas/disponibles`:
+```json
+{ "gruposASuplir": [
+    { "asignaturaId": 101, "crn": "16434", "materia": "Química I", "grupo": "611", "fecha": "2026-08-17", "sesion": 1,
+      "inicio": "07:30", "fin": "08:59",
+      "disponibles": [ { "docenteId": 30, "nombre": "Vanessa Cervantes", "mismaMateria": true, "daClaseEseDia": true,
+                         "suplenciasPeriodo": 2, "recontratable": null } ],
+      "totalDisponibles": 12 } ] }
+```
 
 Ejemplo `POST /faltas`:
 ```json
@@ -171,6 +197,8 @@ Descuento manual: `"modo": "manual"`, `"fechaTexto": "03/08/2026 al 16/08/2026"`
 | GET | `/reportes/descuentos?quincenaId=&excluir=1,2` | Asigna los pendientes a la quincena y descarga `DESCUENTO-PREPA Qnn.xlsx` (con fila de total) |
 | GET | `/reportes/incidencias/validar?quincenaId=` | Avisos (suplencias sin contrato del suplente, PEP > 24 caracteres…) |
 | GET | `/reportes/incidencias?quincenaId=` | Descarga `INCIDENCIAS PREPA Qnn.xlsx` (hojas Incidencia + detalle, **con valores**; suplencias agrupadas por días) |
+| POST | `/reportes/enviar` | 🆕 `{ quincenaId, modo: "borrador"\|"mailto", para?, cc?, cco?, asunto?, cuerpo? }` (si se omiten, se usan los de configuración). Genera los 2 Excel y valida (avisos rojos → `400`). `borrador` → descarga `Reportes PREPA Qnn.eml` (`message/rfc822`, `X-Unsent: 1`, ambos Excel adjuntos); `mailto` → `{ mailto: "mailto:…?subject=…&body=…", archivos: [urls] }`. Registra en `envios_correo` |
+| GET | `/reportes/envios?quincenaId=` | 🆕 Bitácora de envíos |
 
 ## Analítica (panel)
 | Método | Ruta | Descripción |
@@ -181,6 +209,8 @@ Descuento manual: `"modo": "manual"`, `"fechaTexto": "03/08/2026 al 16/08/2026"`
 | GET | `/analitica/perfil-docentes` | Conteos por género, nivel de estudios, campo de formación y rangos de antigüedad |
 | GET | `/analitica/faltas-por-motivo?periodoId=` | Para gráfica |
 | GET | `/analitica/cumpleanos-mes` | Cumpleaños del mes |
+| GET | `/analitica/resumen-ejecutivo?periodoId=&compararCon=&graficas=G1,G2,…` | 🆕 Datos de todas las diapositivas en una sola llamada: `{ portada, kpis, diapositivas: [{ id: "G1", titulo, conclusion, datos }], hallazgos: [] }`. Sin observaciones de baja ni comentarios de alumnos |
+| GET | `/analitica/plantilla?periodos=` | 🆕 Activos, nuevos y bajas (recontratables / no) por semestre (G15) |
 
 ## Rutas que se eliminan de la plantilla
 `/api/auth/status`, `/api/auth/setup`, `/api/auth/login`, `/api/auth/me`, `/api/notas/*`.

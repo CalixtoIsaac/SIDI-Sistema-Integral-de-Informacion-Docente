@@ -1,6 +1,12 @@
 # Formatos Excel - SIDI
 Responsables: Matías Hernández (lectura/escritura) · Uziel García (mapeo a BD) · Validación: Saraí Cecilio (PO)
 
+> **Versión 2.4.2 (29/10/2026, tarde):** respuestas del cliente (§8 #28–#31): correos de destino y **Outlook institucional** → envío como **borrador de Outlook** (§10); **G9 con solo 2 tipos de falta**; motivos de baja confirmados; **F62 también es en línea** (se omite). Único pendiente: reporte de contratos (RH).
+>
+> **Versión 2.4.1 (29/10/2026):** los archivos AD25/EM25/EM26 son el **reporte institucional**; solo se usa el % OPP de Preparatoria Veracruz (§5.4). Gráficas del resumen ejecutivo: las 8 recomendadas.
+>
+> **Versión 2.4 (29/10/2026): retroalimentación de la vista previa.** El cliente aprobó el diseño y todas las vistas. Se **cierran los 2 pendientes de §9** (grupos de 4.5 h = en línea → **se ignoran**; el **reporte de contratos por CRN lo creará la coordinadora** → §7.3) y entran nuevas decisiones (§8 #19–#27): tarifa mensual en la ficha, baja con observaciones y **recontratable**, docentes disponibles al registrar falta, ranking completo con filtros y promedio por semestre, **comparativo OPINA del campus por semestre** (nuevos archivos AD25, EM25, EM26 → §5.4), **envío de reportes por correo** (§10) y **resumen ejecutivo** en el panel. Cambios marcados con 🆕³.
+>
 > **Versión 2.3 (27/10/2026, noche):** se **cierran los pendientes** (§8: tarifa $54 final, Detalle con valores, contrato del suplente, fila de total, antigüedad) y se documentan los dos archivos nuevos: **Excel de grupos docentes** (§7) y **CV en PDF** (§7.1). Cambios marcados con 🆕🆕.
 >
 > **Versión 2.2 (27/10/2026):** incorpora las respuestas a los pendientes 2, 3 y 4, la **nota de campos de consulta del docente** (hoy §7.2) y el análisis de los archivos reales **Q16 a Q20** (10 archivos). Cambios marcados con 🆕.
@@ -17,6 +23,8 @@ Responsables: Matías Hernández (lectura/escritura) · Uziel García (mapeo a B
 | 3 | 🆕🆕 `GRUPOS_DOCENTES_<PERIODO>.xlsx` (información de maestros) | **Entrada** (se importa) | Al inicio del semestre / cambios de carga | No aplica (solo lectura) | ✅ Recibido (AGO-DIC 2026) — §7 |
 | 4 | 🆕🆕 CV de docentes (`.pdf`, formato "A1 CURRICULUM VITAE DOCENTES") | **Entrada** (se importa) | Altas / actualización | No aplica (solo lectura) | ✅ Recibidos (37) — §7.1 |
 | — | `OPINA <periodo>.xlsx / .xlsb` | **Entrada** (se importa) | Semestral | No aplica (solo lectura) | ✅ Recibido (3 periodos) |
+| — | 🆕³ Reporte institucional OPINA (`AD25`, `EM25`, `EM26`) | **Referencia** (no se importa) | Semestral | No aplica | ✅ Recibido — solo se captura el % OPP de Preparatoria Veracruz (§5.4) |
+| 5 | 🆕³ Reporte de contratos por CRN (lo crea la coordinadora) | **Entrada** (se importa) | Al inicio del semestre | Propuesto por SIDI (plantilla descargable) | ⏳ En preparación — §7.3 |
 | — | Tabla de pagos por tipo de clase | Catálogo inicial (`tipos_clase`) | Al cambiar tarifas | Editable en el sistema | ✅ Recibido |
 
 **Hoy ambos formatos de salida se llenan a mano.** El objetivo es que la coordinadora registre faltas, suplencias y pagos en SIDI y descargue los dos archivos ya llenos, idénticos a los que hoy envía.
@@ -251,6 +259,25 @@ Columnas ignoradas: `Flex`, `Flex Connect`, `SE`, `SEED`, `CAG`, `MAPS`, `count`
 ### 5.3 Flujo de importación
 Subir archivo → SIDI detecta versión y periodo → vista previa (periodo, filas, filas descartadas por campus/modalidad, profesores, grupos, profesores sin coincidencia en BD) → confirmar. Reimportar el mismo periodo **reemplaza** las respuestas de ese periodo (con confirmación).
 
+### 5.4 Comparativo del campus por semestre 🆕³ ✅ Resuelto (29/10)
+**Pedido del cliente:** *"El OPINA debe tener comparaciones por semestre del campus (Veracruz)"*.
+
+**Aclaración (29/10):** `AD25.xlsb`, `EM25.xlsb` y `EM26.xlsx` **no son OPINA por alumno**: son el **reporte institucional de resultados** (tablas *General*, *Preparatoria* y *Profesional* por región y campus, columnas *Campus · TT Alumnos · Opiniones Positivas · % OPP*). Para la coordinación **solo importa un dato por semestre: el % OPP de Preparatoria · Veracruz**, para graficar cómo cambia de un semestre a otro. **No se importan** (pesan 5–21 MB y el resto no se usa).
+
+| Semestre | Archivo | Alumnos que opinaron (TT Alumnos) | Opiniones positivas | **% OPP** | Cambio |
+|---|---|---|---|---|---|
+| ENE-MAY 2025 | `EM25.xlsb` | 3,837 | 3,387 | **88.3 %** | — |
+| AGO-DIC 2025 | `AD25.xlsb` | 3,590 | 3,085 | **85.9 %** | ▼ 2.4 pts |
+| ENE-MAY 2026 | `EM26.xlsx` | 3,804 | 3,333 | **87.6 %** | ▲ 1.7 pts |
+
+(% OPP = opiniones positivas ÷ alumnos; verificado contra las celdas del reporte: 88.27 %, 85.93 %, 87.62 %.) Promedio de los 3 semestres: 87.3 %.
+
+**Cómo lo maneja SIDI:**
+- Tabla `opina_campus_semestre` (*04*): por semestre se **capturan 2 números** (alumnos y opiniones positivas) tal como vienen en la fila *Preparatoria → Veracruz* del reporte; el % se calcula. Se precargan los 3 semestres de arriba como semilla.
+- *OPINA → Comparativo del campus*: tabla editable + **gráfica de línea** del % OPP por semestre con el cambio ▲/▼. Es la gráfica **G1** del resumen ejecutivo.
+- Es la **cifra oficial** del campus. La calificación calculada desde el OPINA por alumno (*v_opina_campus*) puede diferir un poco (el reporte institucional cuenta todos los alumnos de Preparatoria Veracruz y SIDI filtra solo presencial); por eso el ranking y el desglose por docente (§5.2) se siguen calculando del OPINA por alumno, y la evolución del campus usa la cifra oficial.
+- Si algún día se quiere comparar con la región, el mismo reporte trae *Centro y Sur* (Preparatoria: 88.5 %, 86.6 %, 85.7 %); queda como columna opcional.
+
 ---
 
 ## 6. Tabla de pagos por tipo de clase (catálogo `tipos_clase`)
@@ -270,6 +297,7 @@ Subir archivo → SIDI detecta versión y periodo → vista previa (periodo, fil
 - **Confirmado (26/10):** la tarifa de 3 h en español es **$54** (la tabla original decía $53 por error; el Excel real y el cálculo proporcional dan $54).
 - 🆕🆕 ✅ **Respuesta final (27/10):** **$54**. Los $53 de Q20 (y $68, $69, $82, $107 en otros archivos) fueron errores de captura o de cálculo manual.
 - **Confirmado:** el "(4)" del encabezado original significa que el semestre se paga en **4 meses**.
+- 🆕³ **Tarifa mensual** = pago total al semestre ÷ 4 (columna calculada, no se captura). Se muestra junto a la tarifa diaria en la ficha del docente y en Configuración.
 
 ---
 
@@ -297,15 +325,16 @@ Hoja única **`Salida`**, encabezados en la fila 1, sin tablas ni celdas combina
 **Una fila = un bloque de horario** (mismos días y mismas horas). Si un CRN tiene sesiones con horas distintas, trae **varias filas**: hay 5 CRN con **dos sesiones el mismo día** (16452, 16479, 16485, 17498, 17510: miércoles 11:00–12:29 y 13:30–15:00).
 
 ### 7.0.1 Qué calcula SIDI con este archivo
-- **Horas por semana del CRN** = Σ duración de cada sesión × días. Las horas de fin terminan en `:29`/`:59`, así que duración = (fin + 1 min) − inicio, redondeada a 0.5 h (`16:00–17:35` = 1.5 h). Resultado en este semestre: 63 CRN de 3 h, 55 de 5 h, 17 de 4 h, 10 de 1.5 h y **2 de 4.5 h** (grupo F61, sin tarifa en la tabla → ver §9).
+- **Horas por semana del CRN** = Σ duración de cada sesión × días. Las horas de fin terminan en `:29`/`:59`, así que duración = (fin + 1 min) − inicio, redondeada a 0.5 h (`16:00–17:35` = 1.5 h). Resultado en este semestre: 63 CRN de 3 h, 55 de 5 h, 17 de 4 h, 10 de 1.5 h y **2 de 4.5 h** (grupo F61). 🆕³ ✅ **Los grupos F61 y F62 son materias en línea que se pagan en otro sistema → se ignoran** (§8 #19 y #31). La regla es **por número de grupo** (`F61`, `F62`, configurable), no por horas: la vista previa los muestra como *"Omitidos (en línea)"* y no se importan. F61 = CRN 22023 y 22024 (4.5 h); los CRN de F62 se listan en la vista previa al importar. Quedan **147 − (CRN de F61 y F62)** grupos a administrar (≈ 145 o menos).
 - **Idioma sugerido:** `EN` si la materia es la versión en inglés (tiene clave propia: `BSMA2003 Math III`, `BSCN2004 Mass and energy II`, `BSHU2004 Great universal writers`, `BSCN3002 Human body care`) **o** si la modalidad es `Bachillerato Intercultural`; en otro caso `ES`. Validado contra Q16–Q20: horas + idioma dan la tarifa cobrada en **41 de 43 CRN** (contando $53/$68/$69/$107 como los errores de captura ya identificados). Los 2 restantes no cuadran en horas: 16434 (en el Excel de grupos es de otro docente, 1.5 h) y 17502 (1.5 h en el Excel, se cobró como 3 h). Es una **sugerencia editable**.
-- **Tipo de clase / tarifa** = (horas, idioma) → `tipos_clase`. Si no hay tarifa para esas horas (4.5 h) el CRN queda marcado "Sin tarifa" hasta que se asigne a mano.
+- **Tipo de clase / tarifa** = (horas, idioma) → `tipos_clase`. 🆕³ Los CRN de F61/F62 se omiten (en línea). Si aparece otra combinación sin tarifa, el CRN queda marcado "Sin tarifa" hasta que se asigne a mano.
+- 🆕³ **Tarifa mensual** del CRN = `pago_semestre ÷ 4` (el semestre se paga en 4 meses, §6): 5 h ES $2,940 · 5 h EN $3,528 · 4 h ES $2,352 · 4 h EN $2,822.50 · 3 h ES $1,764 · 3 h EN $2,116.75 · 1.5 h ES $882 · 1.5 h EN $1,058.50. Se muestra en la ficha **a la derecha de la tarifa diaria** (§8 #20).
 - **Plan (General / Bilingüe):** `Bachillerato Intercultural` → Bilingüe; `Teórica` → General.
 - **Número de grupos asignados** del docente = CRN distintos del periodo (§7.2).
 - Las materias `VSPP…` (Fútbol, Tenis de mesa, Teatro, Acondicionamiento físico) son actividades deportivas/culturales: su CeCo por defecto es `5422101001`.
 
 ### 7.0.2 Lo que **no** trae (sigue siendo captura manual)
-- **Contrato por CRN** (columna B de Descuentos). Indispensable para registrar faltas: la ficha marca "Sin contrato" en cada CRN que no lo tenga (ver §9).
+- **Contrato por CRN** (columna B de Descuentos). Indispensable para registrar faltas: la ficha marca "Sin contrato" en cada CRN que no lo tenga. 🆕³ Se cargará con el **reporte de contratos** que preparará la coordinadora (§7.3).
 - Actividades sin CRN (Ruta exploratoria) → "+ Agregar actividad".
 - Suplentes que no dan clases este semestre (Q20: *Dora Vega Aquino*, nómina 22464 — sí aparece en el Excel de grupos de AGO-DIC 2026, pero no en Q16–Q19) → al indicar quién cubrió una falta se puede **dar de alta rápido** un docente con solo nómina y nombre.
 
@@ -362,6 +391,29 @@ Consecuencias:
 
 ---
 
+## 7.3 Reporte de contratos por CRN (entrada) 🆕³ ⏳ En preparación
+✅ **Respuesta del cliente (29/10):** hoy **no existe** un reporte con el contrato de cada CRN; **la coordinadora lo creará** para facilitar el proceso (§8 #27). Para que su trabajo sea mínimo y el archivo se lea sin errores, SIDI le ofrece una **plantilla prellenada**:
+
+1. *Configuración → Contratos → [⬇ Descargar plantilla de contratos]* genera `CONTRATOS_<PERIODO>.xlsx` con los 145 CRN del periodo ya llenos; ella **solo escribe la columna Contrato**.
+2. La vuelve a subir: vista previa → confirmar. Reimportar actualiza solo los contratos que cambiaron.
+
+Hoja **`Contratos`**, encabezados en la fila 1:
+| Col | Encabezado | Ejemplo | Uso |
+|---|---|---|---|
+| A | CRN | `16022` (texto) | Llave (con el periodo) → `asignaturas` |
+| B | Materia | `Math III: regularity and repetition` | Solo referencia (no se lee) |
+| C | Grupo | `611` | Solo referencia |
+| D | Nómina | `L03583117` | Validación: debe ser el docente del CRN |
+| E | Docente | `Guillermo Sosa Von Putlitz` | Solo referencia |
+| F | **Contrato** | `5568351` | `asignaturas.num_contrato` (solo dígitos, longitud libre) |
+
+- También acepta un archivo hecho por ella en otro orden, siempre que tenga columnas **CRN** y **Contrato** (alias: `No. de contrato`, `# Contrato`, `Contrato`); la **nómina** es opcional (si viene se valida).
+- Avisos de la vista previa: CRN que no existe en el periodo, nómina que no corresponde al docente del CRN, contrato con caracteres no numéricos, CRN sin contrato, contrato que ya tenía otro valor capturado a mano (se elige cuál conservar).
+- Las **actividades sin CRN** (Ruta exploratoria) se agregan como filas con CRN vacío y nombre de la actividad en Materia (opcional).
+- **Mitiga el riesgo principal del Sprint 2**: con este archivo los 145 contratos se cargan en una sola subida antes del día 6.
+
+---
+
 ## 8. Decisiones confirmadas con el cliente
 | # | Fecha | Pregunta | Respuesta |
 |---|---|---|---|
@@ -379,12 +431,54 @@ Consecuencias:
 | 15 | 27/10 | Contrato del suplente en Incidencias | **Cualquiera de los contratos del docente que suple**, siempre que sea suyo. SIDI propone su primer contrato del periodo y deja elegir entre los suyos; no acepta un contrato de otro docente. Si el suplente no tiene contratos registrados (suplente externo), se permite vacío con aviso (así viene en Q20) |
 | 16 | 27/10 | Fila de total en Descuentos | **Siempre** se incluye (`=SUM(K2:Kn)` en K, §3.2) |
 | 17 | 27/10 | Antigüedad | **Desde el primer semestre que dio clases** (§7.2 #10) |
+| 28 🆕³ | 29/10 | Correos de destino y cuenta de envío | Para: `garcia.sandra@tecmilenio.mx`, `ruben.salas@tecmilenio.mx`, `jjbarradas@tecmilenio.mx` (los 3 reciben **ambos** reportes en un solo correo). Se envía desde **Outlook institucional** → modo **borrador de Outlook** (§10.2) |
+| 29 🆕³ | 29/10 | Faltas en el **resumen ejecutivo** (G9 y KPIs) | **Solo 2 tipos:** **Asunto personal** (= asunto personal + falta no justificada / injustificada) e **Incapacidad médica** (= incapacidad IMSS + cita médica IMSS). Es una agrupación para la gráfica; los textos de los Excel de Nacional no cambian |
+| 30 🆕³ | 29/10 | Motivos de baja | ✅ La lista propuesta tal cual: *Sin disponibilidad de horario* y *Renuncia* → recontratable; *No cumplió expectativas* y *Problemas de conducta o disciplina* → no recontratable; *Otro* → sin sugerencia |
+| 31 🆕³ | 29/10 | ¿El grupo F62 es en línea? | **Sí.** Se omiten **todos los CRN de los grupos F61 y F62** al importar el Excel de grupos (§7.0.1) |
+| 19 🆕³ | 29/10 | Tarifa de los grupos de 4.5 h/semana (CRN 22023 y 22024, F61) | **Se ignoran**: son materias en línea que se pagan en otro sistema. No se importan del Excel de grupos (§7.0.1) |
+| 20 🆕³ | 29/10 | Ficha del docente | Agregar la **tarifa mensual** (= semestre ÷ 4) **justo a la derecha** de la tarifa diaria |
+| 21 🆕³ | 29/10 | Registrar falta: ¿proponer suplentes? | **Sí**: proponer los **docentes disponibles** (sin clase que se empalme con el horario del grupo) y mostrar los **grupos que necesitarán suplirse** por la falta |
+| 22 🆕³ | 29/10 | Ranking OPINA | **Ranking completo**, con filtro para ver a los **mejores y peores**, y el **promedio de todos los maestros por semestre** |
+| 23 🆕³ | 29/10 | Comparativo OPINA | Gráfica de cómo cambia **por semestre el % OPP de Preparatoria Veracruz** del reporte institucional (88.3 % → 85.9 % → 87.6 %); se capturan 2 números por semestre, no se importa el archivo (§5.4) |
+| 24 🆕³ | 29/10 | Suspender (dar de baja) a un docente | Pedir **observaciones** (por qué) y si es **recontratable**: *sin disponibilidad* → **Recontratable**; *no cumplió expectativas o tuvo problemas* → **No recontratable** |
+| 25 🆕³ | 29/10 | Reportes para Nacional | Opción de **enviarlos por correo** a direcciones específicas (§10) |
+| 26 🆕³ | 29/10 | Panel administrativo | Agregar un **resumen ejecutivo** tipo presentación formal con gráficas; el equipo propone las gráficas y el cliente elige (*05 §1.1*) |
+| 27 🆕³ | 29/10 | ¿Existe un reporte con el contrato de cada CRN? | **No por ahora; la coordinadora lo creará.** SIDI le da una plantilla prellenada (§7.3) |
 | 18 | 27/10 | ¿Las faltas justificadas se descuentan? | Se adopta la regla observada en Q16–Q20: **incapacidad o cita del IMSS → no se descuenta** (el suplente sí se paga y Detalle muestra 0 descontado); **permiso personal → sí se descuenta**, aunque se avise con anticipación |
 
 ## 9. Pendientes con el cliente
-Las preguntas 1–11 de la versión anterior quedan **cerradas** (§8). Quedan 2 que surgieron con el Excel de grupos y no bloquean el inicio:
+🆕³ Las 2 preguntas de la versión 2.3 quedan **cerradas** (§8 #19 y #27). Nuevos pendientes de la retroalimentación del 29/10:
 
 | # | Pregunta | Por qué importa | Mientras tanto |
 |---|---|---|---|
-| 1 | **Tarifa de los grupos de 4.5 h/semana** (CRN 22023 y 22024, grupo F61, 3 sesiones de 1 h 35 min). La tabla de pagos no tiene 4.5 h | Sin tarifa no se puede calcular el descuento de esos CRN | Quedan "Sin tarifa"; si faltan, se usa descuento manual |
-| 2 | **¿Existe un reporte con el contrato de cada CRN?** El Excel de grupos no lo trae y hoy se escribe a mano en Descuentos | Sin contrato no se puede generar Descuentos. Son ~147 CRN por semestre | La coordinadora captura el contrato al registrar la primera falta de cada CRN (SIDI lo recuerda) |
+| 1 | ~~¿Qué gráficas lleva el resumen ejecutivo?~~ | ✅ **Las 8 recomendadas** (29/10); no había un resumen previo | — |
+| 2 | ~~Correos de destino y cuenta de envío~~ | ✅ 3 destinatarios, desde **Outlook institucional** (§8 #28, §10) | — |
+| 3 | ~~Motivos de baja~~ | ✅ La lista propuesta, tal cual (§8 #30) | — |
+| 4 | ~~¿F62 también es en línea?~~ | ✅ Sí → se omite igual que F61 (§8 #31) | — |
+| 5 | **Reporte de contratos por CRN:** la coordinadora **preguntó a RH** si existe (esperando respuesta) | Si RH lo tiene, se importa ese archivo (§7.3 acepta cualquier archivo con columnas CRN y Contrato); si no, se usa la plantilla de SIDI | Captura del contrato al registrar la primera falta de cada CRN; pruebas con los contratos de Q16–Q20 |
+
+**Único pendiente con el cliente: #5 (contratos, depende de RH).**
+
+---
+
+## 10. Envío de reportes por correo 🆕³ (§8 #25, #28)
+**Pregunta del cliente:** *¿Podría el programa enviar automáticamente el reporte del Excel por correo (Gmail, Outlook, etc.)?* → **Sí.** ✅ **Decisión (29/10):** se envía desde **Outlook institucional** a `garcia.sandra@tecmilenio.mx`, `ruben.salas@tecmilenio.mx`, `jjbarradas@tecmilenio.mx` → se implementa el **modo A (borrador de Outlook)**; el envío directo por SMTP sale del alcance (§10.2).
+
+### 10.1 Qué se envía
+- **Un correo por quincena con los dos archivos** (`DESCUENTO-PREPA Qnn.xlsx` e `INCIDENCIAS PREPA Qnn.xlsx`).
+- Destinatarios **fijos y editables** en *Configuración → Correo* (Para, CC, CCO; validación de formato). Valor inicial — Para: `garcia.sandra@tecmilenio.mx`, `ruben.salas@tecmilenio.mx`, `jjbarradas@tecmilenio.mx`.
+- Asunto y cuerpo con plantilla editable y variables: `{quincena}` (Q16), `{periodo}` (16–31 ago 2026), `{fecha_pago}`, `{total_descontado}`, `{num_faltas}`, `{num_pagos}`. Ejemplo: *"Reportes PREPA Veracruz Q16 — Descuentos e Incidencias"*.
+- Antes de enviar se muestran los **avisos de validación** de los reportes (*06*, `/reportes/*/validar`). Con avisos rojos no se envía.
+- Cada envío queda en una **bitácora** (fecha, destinatarios, archivos, modo, resultado) y la quincena muestra *"Enviado el 30/08/2026 10:42"*.
+- **"Automático" = un clic**: *[✉ Enviar a Nacional]* genera los dos archivos y los envía. Opción en Configuración: **enviar al cerrar la quincena** (pregunta antes). No se programa un envío por fecha/hora: SIDI corre en la computadora de la coordinadora (puede estar apagada) y los reportes se revisan antes de mandarlos.
+
+### 10.2 Modos de envío
+| Modo | Cómo funciona | Requisitos | Recomendación |
+|---|---|---|---|
+| **A. Preparar correo (borrador)** ✅ **Elegido** | SIDI genera un archivo `.eml` con los dos Excel adjuntos, destinatarios, asunto y cuerpo, marcado como borrador (`X-Unsent: 1`). Al abrirlo, **Outlook** de escritorio muestra el correo listo y ella solo presiona *Enviar* desde su cuenta institucional | Ninguno (no guarda contraseñas). Validar en su computadora qué Outlook usa (clásico o nuevo) | ✅ **Modo por defecto.** Funciona con la cuenta institucional sin pedir nada a TI |
+| ~~B. Envío directo (SMTP)~~ | SIDI envía el correo con **Nodemailer** desde una cuenta configurada | Gmail con contraseña de aplicación u otro SMTP con usuario y contraseña | ❌ **Fuera de alcance**: la cuenta es Outlook institucional (ver C) |
+| C. Outlook / Microsoft 365 institucional con envío directo | Microsoft deshabilita por defecto la autenticación básica de SMTP en Exchange Online a finales de diciembre de 2026; después solo funciona **OAuth** (registrar una aplicación con aprobación de TI, Microsoft Graph) | Permiso del área de TI de la institución | ❌ Fuera de alcance por ahora; se reevalúa si TI lo aprueba |
+
+- **Prueba obligatoria en la computadora de la coordinadora:** abrir un `.eml` de prueba con su Outlook (clásico o el nuevo Outlook para Windows) y confirmar que aparece como borrador con los 2 adjuntos y los 3 destinatarios.
+- **Respaldo si su Outlook no abre el `.eml` como borrador:** *[✉ Enviar a Nacional]* descarga los 2 Excel y abre un correo nuevo (`mailto:`) con destinatarios, asunto y cuerpo ya escritos; ella solo **arrastra los 2 archivos** al correo. (`mailto:` no permite adjuntar archivos.)
+- Como no se guardan contraseñas, no hay `SMTP_USER`/`SMTP_PASS` ni correo de prueba.

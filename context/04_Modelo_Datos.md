@@ -1,6 +1,8 @@
 # Modelo de Datos - SIDI
 Responsable: Uziel Armando García Duarte · Motor: **SQLite** (`better-sqlite3`, archivo `data/app.db`)
 
+> **Versión 2.4 (29/10/2026): retroalimentación de la vista previa** (*07 §8 #19–#27*). Nuevo en el esquema (migración `002_retro_cliente.sql`): **`opina_campus_semestre`** (% OPP oficial de Preparatoria Veracruz, 2 números por semestre), `tipos_clase.pago_mensual` (calculada), tabla **`docente_bajas`** (motivo, observaciones, recontratable) y `docentes.recontratable`, catálogo `motivo_baja`, **`contratos_importaciones`**, **`envios_correo`**, vista **`v_opina_campus`** y claves de configuración de correo. Los grupos de 4.5 h (en línea) no se importan.
+>
 > **Versión 2.3 (27/10/2026):** pendientes cerrados (*07 §8*). Nuevas fuentes: **Excel de grupos docentes** (CRN, materia, horario → horas/semana) y **CV en PDF** (CURP, fecha de nacimiento, género, grados). Se agregan los 12 campos de consulta del docente (*07 §7.2*), sesiones por falta, justificación IMSS, quincena de reporte, agrupación de suplencias y contrato del suplente. La hoja Detalle ya **no** usa vínculo externo.
 >
 > Versión 2.1 (26/10/2026): tarifa $54, pago en 4 meses, jornada = días, OPINA global ponderada.
@@ -13,6 +15,7 @@ periodos 1──* asignaturas *──1 docentes 1──* titulos_docente
                │                                 ├──* incidencias *──0..1 quincenas
                └──* opina_respuestas *───────────┘      faltas *──0..1 quincenas (de reporte)
 opina_importaciones 1──* opina_respuestas      grupos_importaciones (historial)
+docentes 1──* docente_bajas 🆕   asignaturas ←── contratos_importaciones 🆕   quincenas 1──* envios_correo 🆕
 departamentos 1──* docentes        catalogos (cc_nomina, motivos, CeCo, textos, nivel, campo)        configuracion (clave/valor)
 ```
 
@@ -32,6 +35,10 @@ departamentos 1──* docentes        catalogos (cc_nomina, motivos, CeCo, text
 - **Periodos** como los nombra la institución: `AGO-DIC 2024`, `ENE-MAY 2025`, `ENE-MAY 2026`, `AGO-DIC 2026`. `etiqueta_opina` (`2026 Ago - Dic`) es el mismo texto en OPINA y en el Excel de grupos. "Da clases el semestre actual" = tiene asignaturas en el periodo `actual`.
 - **Quincenas** numeradas 1–24 por año según la **fecha de pago** (`2026-Q16` = pago 30/08/2026).
 - **Sin tabla `usuarios`** (no hay login). Las preferencias del perfil van en `configuracion`.
+- 🆕 **Baja con historial:** suspender crea un registro en `docente_bajas` (motivo, observaciones, recontratable, periodo). `docentes.recontratable` guarda el valor de la **última** baja para filtrar rápido (`NULL` = nunca dado de baja). Reactivar no borra el historial.
+- 🆕 **Tarifa mensual** = `pago_semestre / 4` como **columna generada** (no se captura; cambia sola si cambia la tarifa).
+- 🆕 **Grupos en línea:** los CRN de los grupos **F61 y F62** (configurable en `grupos.omitir_grupos`) **no se importan** (*07 §8 #19, #31*); quedan solo en el historial de la importación.
+- 🆕 **Correo:** destinatarios y plantillas en `configuracion`. SIDI **no envía** ni guarda contraseñas: genera el borrador de Outlook (*07 §10*). Cada borrador generado queda en `envios_correo`.
 - SQLite: fechas como `TEXT` ISO, booleanos como `INTEGER 0/1`, JSON como `TEXT` (con `json_extract`). `PRAGMA foreign_keys = ON` (ya está en la plantilla).
 
 ## 3. Tipos de datos clave
@@ -58,7 +65,15 @@ CREATE TABLE IF NOT EXISTS configuracion (
 );
 -- semillas: tema.modo='automatico', tema.color='#DB2777', perfil.nombre='Coordinación de Docentes',
 --           opina.muestra_minima='10', opina.campus='Veracruz', opina.solo_presencial='1',
---           reportes.agrupar_suplencias='1'
+--           reportes.agrupar_suplencias='1',
+--           grupos.omitir_grupos='F61,F62'                  -- 🆕 grupos en línea que no se importan (07 §8 #31)
+--           correo.modo='borrador'                          -- 🆕 borrador de Outlook (.eml); sin SMTP (07 §10)
+--           correo.para='garcia.sandra@tecmilenio.mx;ruben.salas@tecmilenio.mx;jjbarradas@tecmilenio.mx'
+--           correo.cc='', correo.cco=''                     -- listas separadas por ';'
+--           correo.asunto='Reportes PREPA Veracruz {quincena} — Descuentos e Incidencias'
+--           correo.cuerpo='Buen día, adjunto los reportes de la quincena {quincena} ({periodo}) …'
+--           correo.enviar_al_cerrar='0'
+--           opina.top_n='10'                                -- 🆕 tamaño por defecto del filtro mejores/peores
 -- (se elimina reportes.ruta_descuentos: la hoja Detalle ya no usa vínculo externo)
 
 -- ===== Catálogos =====
@@ -74,6 +89,7 @@ CREATE TABLE IF NOT EXISTS tipos_clase (
   idioma TEXT NOT NULL CHECK (idioma IN ('ES','EN')),
   pago_semestre REAL NOT NULL,                    -- 11760.00
   pago_por_dia REAL NOT NULL,                     -- 90.00  (monto a descontar por día de falta en ese CRN)
+  pago_mensual REAL GENERATED ALWAYS AS (ROUND(pago_semestre / 4.0, 2)) VIRTUAL,  -- 🆕 2940.00 (semestre en 4 meses)
   activo INTEGER NOT NULL DEFAULT 1,
   UNIQUE (horas_semana, idioma)
 );
@@ -83,7 +99,7 @@ CREATE TABLE IF NOT EXISTS catalogos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   tipo TEXT NOT NULL CHECK (tipo IN ('cc_nomina','motivo_incidencia','cuenta_cargo',
                                      'motivo_falta','horas_falta','situacion','estatus_falta','tipo_contrato',
-                                     'nivel_estudios','campo_formacion')),
+                                     'nivel_estudios','campo_formacion','motivo_baja')),   -- 🆕 motivo_baja
   valor TEXT NOT NULL,
   descripcion TEXT,
   orden INTEGER NOT NULL DEFAULT 0,               -- en nivel_estudios define el orden (1 Licenciatura … 4 Doctorado)
@@ -108,6 +124,9 @@ CREATE TABLE IF NOT EXISTS catalogos (
 --  campo_formacion: 'Ingeniería y Tecnología', 'Ciencias Exactas', 'Ciencias Naturales y de la Salud',
 --                   'Ciencias Sociales', 'Económico-Administrativas', 'Educación', 'Humanidades',
 --                   'Idiomas', 'Artes', 'Deporte'  (propuesta editable)
+--  motivo_baja 🆕 (descripcion = recontratable sugerido '1'/'0'):
+--                   'Sin disponibilidad de horario' (1), 'Renuncia' (1), 'No cumplió expectativas' (0),
+--                   'Problemas de conducta o disciplina' (0), 'Otro' (sin sugerencia)   -- ✅ confirmado, 07 §8 #30
 
 CREATE TABLE IF NOT EXISTS periodos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -149,11 +168,24 @@ CREATE TABLE IF NOT EXISTS docentes (
   tipo_contrato TEXT DEFAULT 'determinado',
   departamento_id INTEGER REFERENCES departamentos(id),
   activo INTEGER NOT NULL DEFAULT 1,
+  recontratable INTEGER CHECK (recontratable IN (0,1)),  -- 🆕 de la última baja; NULL = nunca dado de baja
   origen TEXT NOT NULL DEFAULT 'manual' CHECK (origen IN ('manual','excel_grupos','opina','cv','alta_rapida')),
   revisar TEXT,                                   -- motivo de revisión (p. ej. 'Fecha de nacimiento del CV ≠ CURP')
   datos_adicionales TEXT NOT NULL DEFAULT '{}',   -- JSON (columnas desconocidas, idiomas y cursos del CV)
   creado_en TEXT NOT NULL DEFAULT (datetime('now','localtime')),
   actualizado_en TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+-- 🆕 Historial de bajas (suspensiones) con observaciones y si es recontratable
+CREATE TABLE IF NOT EXISTS docente_bajas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  docente_id INTEGER NOT NULL REFERENCES docentes(id) ON DELETE CASCADE,
+  periodo_id INTEGER REFERENCES periodos(id),     -- semestre en que se dio de baja
+  fecha TEXT NOT NULL DEFAULT (date('now','localtime')),
+  motivo TEXT NOT NULL,                           -- catálogo motivo_baja
+  observaciones TEXT NOT NULL,                    -- por qué se dio de baja (obligatorio, texto libre)
+  recontratable INTEGER NOT NULL CHECK (recontratable IN (0,1)),
+  fecha_reactivacion TEXT                         -- se llena al reactivar (el registro no se borra)
 );
 
 CREATE TABLE IF NOT EXISTS titulos_docente (
@@ -224,6 +256,17 @@ CREATE TABLE IF NOT EXISTS grupos_importaciones (
   importado_en TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
+-- 🆕 Cargas del reporte de contratos por CRN (07 §7.3)
+CREATE TABLE IF NOT EXISTS contratos_importaciones (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  periodo_id INTEGER NOT NULL REFERENCES periodos(id),
+  archivo TEXT NOT NULL,
+  filas INTEGER NOT NULL,
+  actualizados INTEGER NOT NULL,                  -- contratos nuevos o cambiados
+  con_aviso INTEGER NOT NULL DEFAULT 0,
+  importado_en TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
 -- ===== Faltas y descuentos (→ DESCUENTO-PREPA Qnn.xlsx) =====
 CREATE TABLE IF NOT EXISTS faltas (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -281,6 +324,19 @@ CREATE TABLE IF NOT EXISTS suplencias (
   monto REAL NOT NULL                             -- = tarifa del CRN (igual al descontado; si la falta es IMSS se paga igual)
 );
 
+-- 🆕 Bitácora de envíos de reportes por correo (07 §10)
+CREATE TABLE IF NOT EXISTS envios_correo (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  quincena_id INTEGER NOT NULL REFERENCES quincenas(id),
+  reportes TEXT NOT NULL,                         -- 'descuentos,incidencias'
+  modo TEXT NOT NULL DEFAULT 'borrador' CHECK (modo IN ('borrador','mailto')),   -- mailto = respaldo sin adjuntos
+  para TEXT NOT NULL, cc TEXT, cco TEXT,
+  asunto TEXT NOT NULL,
+  resultado TEXT NOT NULL CHECK (resultado IN ('borrador_generado','mailto_abierto','error')),   -- SIDI no envía: Outlook lo hace
+  detalle_error TEXT,
+  enviado_en TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
 -- ===== OPINA =====
 CREATE TABLE IF NOT EXISTS opina_importaciones (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -328,6 +384,34 @@ SELECT periodo_id, docente_id,
 FROM opina_respuestas
 GROUP BY periodo_id, docente_id;
 
+-- 🆕 % OPP OFICIAL de Preparatoria Veracruz por semestre (reporte institucional OPINA, 07 §5.4)
+-- Se capturan 2 números por semestre; es la fuente de la gráfica G1 y del comparativo del campus.
+CREATE TABLE IF NOT EXISTS opina_campus_semestre (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  periodo_id INTEGER NOT NULL UNIQUE REFERENCES periodos(id),
+  alumnos INTEGER NOT NULL CHECK (alumnos > 0),           -- 'TT Alumnos' de Preparatoria → Veracruz
+  positivas INTEGER NOT NULL CHECK (positivas >= 0),      -- 'Opiniones Positivas'
+  opp REAL GENERATED ALWAYS AS (ROUND(100.0 * positivas / alumnos, 1)) VIRTUAL,
+  region_opp REAL,                                        -- opcional: % OPP de Preparatoria · Centro y Sur
+  fuente TEXT,                                            -- 'EM26.xlsx'
+  capturado_en TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  CHECK (positivas <= alumnos)
+);
+-- semillas: ENE-MAY 2025 (3837, 3387) · AGO-DIC 2025 (3590, 3085) · ENE-MAY 2026 (3804, 3333)
+
+-- Calificación del campus calculada desde OPINA por alumno (referencia interna; puede diferir de la oficial)
+-- calificacion_campus: ponderada por alumnos. El promedio simple de maestros y la mediana se calculan
+-- en opinaService sobre v_opina_docente (excluyendo muestra insuficiente).
+CREATE VIEW IF NOT EXISTS v_opina_campus AS
+SELECT periodo_id,
+       COUNT(*)                                     AS respuestas,
+       SUM(recomienda)                              AS positivas,
+       ROUND(100.0 * SUM(recomienda) / COUNT(*), 1) AS calificacion_campus,
+       COUNT(DISTINCT docente_id)                   AS docentes,
+       COUNT(DISTINCT crn)                          AS grupos
+FROM opina_respuestas
+GROUP BY periodo_id;
+
 -- Perfil académico calculado (campos 8 y 11 de 07 §7.2)
 CREATE VIEW IF NOT EXISTS v_docente_estudios AS
 SELECT d.id AS docente_id,
@@ -359,6 +443,9 @@ CREATE INDEX IF NOT EXISTS idx_faltas_quincena   ON faltas(quincena_id, docente_
 CREATE INDEX IF NOT EXISTS idx_faltas_pendientes ON faltas(fecha) WHERE quincena_id IS NULL;
 CREATE INDEX IF NOT EXISTS idx_inc_quincena      ON incidencias(quincena_id, orden);
 CREATE INDEX IF NOT EXISTS idx_opina_periodo     ON opina_respuestas(periodo_id, docente_id);
+CREATE INDEX IF NOT EXISTS idx_bajas_docente     ON docente_bajas(docente_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_docentes_recont   ON docentes(recontratable);
+CREATE INDEX IF NOT EXISTS idx_envios_quincena   ON envios_correo(quincena_id);
 ```
 
 ## 5. Reglas de negocio
@@ -373,7 +460,13 @@ duracion(sesion)     = redondear_a_0.5h((hora_fin + 1 min) − hora_inicio)   --
 horas_semana         = Σ duracion de sus sesiones (cada día marcado 'SI' es una sesión)
 idioma_sugerido      = 'EN' si la materia es versión en inglés (BSMA2003, BSCN2004, BSHU2004, BSCN3002…)
                              o modalidad = 'Bachillerato Intercultural';  si no 'ES'
-tipo_clase           = tipos_clase(horas_semana, idioma)  -- sin coincidencia (p. ej. 4.5 h) → NULL "Sin tarifa"
+omitir CRN           = numero_grupo ∈ grupos.omitir_grupos (F61, F62 = en línea, otro sistema) → no se importa   -- 🆕
+
+-- 🆕 Tipo de falta para el resumen ejecutivo (07 §8 #29; solo agrupa, no cambia los textos de Nacional)
+tipo_resumen(falta)  = justificacion IN ('incapacidad_imss','cita_imss') → 'Incapacidad médica'
+                       en otro caso (asunto personal, falta injustificada / no justificada) → 'Asunto personal'
+tipo_clase           = tipos_clase(horas_semana, idioma)  -- sin coincidencia → NULL "Sin tarifa"
+tarifa_mensual       = tipos_clase.pago_semestre / 4                                                -- 🆕
 plan                 = modalidad 'Bachillerato Intercultural' → 'Bachillerato General Bilingüe'; si no 'Bachillerato General'
 
 -- Falta con modo 'tarifa' (una por CRN, día y sesión)
@@ -410,6 +503,33 @@ calificacion_crn     = 100 × Σ recomienda / respuestas  del CRN
 calificacion_global  = 100 × Σ recomienda / Σ respuestas  de todos sus CRN del periodo
                        -- solo grupos presenciales del campus Veracruz; 'muestra insuficiente' si respuestas < muestra_minima
 
+-- 🆕 Baja (suspender)
+suspender            = docentes.activo = 0; INSERT docente_bajas(motivo, observaciones, recontratable, periodo actual)
+recontratable sug.   = catalogos(motivo_baja).descripcion ('1' sin disponibilidad / '0' expectativas o problemas); editable
+docentes.recontratable = recontratable de la última baja
+reactivar            = activo = 1; docente_bajas.fecha_reactivacion = hoy (si recontratable = 0 pide confirmación)
+avisos               = al importar el Excel de grupos o al elegir suplente, un docente con recontratable = 0 se marca ⚠
+
+-- 🆕 Grupos a suplir y docentes disponibles (al registrar una falta)
+grupos_a_suplir      = sesiones (horarios) de las asignaturas elegidas en cada fecha de falta (día de la semana)
+disponible(d, sesión)= d.activo = 1  y  d ≠ titular  y  d no tiene falta registrada ese día
+                       y NO existe horario de d en el periodo actual con mismo dia_semana
+                           y hora_inicio < sesión.fin  y  sesión.inicio < hora_fin            -- sin empalme
+orden sugerido       = 1) imparte la misma clave_materia  2) ya da clases ese día (está en el campus)
+                       3) menos suplencias en el periodo  4) alfabético
+                       (recontratable = 0 → al final con ⚠; inactivos no aparecen)
+
+-- 🆕 OPINA campus por semestre (07 §5.4)
+opp_oficial          = opina_campus_semestre.positivas / alumnos × 100          -- G1 y comparativo del campus
+calificacion_campus  = v_opina_campus.calificacion_campus                     -- referencia: Σ Sí ÷ Σ respuestas (OPINA por alumno)
+promedio_maestros    = AVG(v_opina_docente.porcentaje) con respuestas ≥ muestra_minima
+variacion            = valor(periodo) − valor(periodo anterior)   en puntos porcentuales
+ranking filtro       = mejores: ORDER BY porcentaje DESC LIMIT n · peores: ORDER BY porcentaje ASC LIMIT n
+                       · rango: porcentaje BETWEEN min AND max
+
+-- 🆕 Contratos (07 §7.3)
+importar contrato    = asignaturas(periodo, crn).num_contrato = Contrato  (si viene nómina, debe ser la del docente del CRN)
+
 -- Docente (CV y CURP)
 fecha_nacimiento     = CURP[5..10] como AAMMDD; siglo = CURP[17] dígito → 19xx, letra → 20xx
 genero               = CURP[11]: 'H' → 'M', 'M' → 'F'
@@ -430,10 +550,12 @@ Una quincena `cerrada` no permite editar sus faltas ni incidencias (evita cambia
 ## 6. Semillas (`lib/semillas.js`)
 - `tipos_clase`: las 8 filas de la tabla de pagos (*07 §6*), con **$54** para 3 h en español (respuesta final).
 - `catalogos`: valores listados arriba (incluye `nivel_estudios` y `campo_formacion`).
-- `periodos`: AGO-DIC 2024, ENE-MAY 2025, ENE-MAY 2026, AGO-DIC 2026 (actual), con `fecha_inicio` (1 ago / 1 ene).
+- `periodos`: AGO-DIC 2024, ENE-MAY 2025, **AGO-DIC 2025** 🆕 (archivo AD25), ENE-MAY 2026, AGO-DIC 2026 (actual), con `fecha_inicio` (1 ago / 1 ene) y `etiqueta_opina`.
 - `quincenas`: las 24 del año en curso, con `fecha_pago` = día 15 / último día del mes (editable; Q16 2026 se paga el 30/08).
 - `configuracion`: valores por defecto del perfil y de OPINA.
 
 ## 7. Pendientes
-- Tarifa para grupos de **4.5 h/semana** (F61) — *07 §9*. Mientras, quedan "Sin tarifa".
-- Fuente del **contrato por CRN** — *07 §9*. Mientras, captura manual.
+- ~~Tarifa para grupos de 4.5 h/semana~~ → ✅ se omiten (en línea).
+- ~~Fuente del contrato por CRN~~ → ✅ reporte de la coordinadora (`contratos_importaciones`, *07 §7.3*).
+- ✅ Catálogo `motivo_baja` confirmado; F62 en línea (se omite).
+- ⏳ Reporte de contratos: la coordinadora preguntó a **RH** si existe (*07 §9 #5*).
