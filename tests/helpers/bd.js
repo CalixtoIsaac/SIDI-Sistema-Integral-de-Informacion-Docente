@@ -13,7 +13,7 @@ function ddl() {
   if (fs.existsSync(migracion)) return fs.readFileSync(migracion, 'utf8');
   const doc = fs.readFileSync(path.join(RAIZ, 'context', '04_Modelo_Datos.md'), 'utf8');
   const seccion = doc.slice(doc.indexOf('## 4. DDL'));
-  const m = seccion.match(/```sql\n([\s\S]*?)```/);
+  const m = seccion.match(/```sql\r?\n([\s\S]*?)```/);
   if (!m) throw new Error('No se encontró el DDL en 04_Modelo_Datos.md');
   return m[1];
 }
