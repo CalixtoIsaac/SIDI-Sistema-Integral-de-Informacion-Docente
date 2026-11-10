@@ -37,6 +37,10 @@ app.get('/api/health', (req, res) => {
 });
 app.use('/api/auth', require('./routes/auth'));
 
+// ---------- SIDI (sin login, 03 §1) ----------
+app.use('/api/grupos', require('./routes/grupos'));
+app.use('/api/opina', require('./routes/opina'));
+
 // ---------- API protegida: todo lo que sigue requiere sesión ----------
 app.use('/api', requireAuth);
 app.use('/api/notas', require('./routes/notas'));
