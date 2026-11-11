@@ -344,6 +344,16 @@ function detalle(db, id, opciones = {}) {
   };
 }
 
+/** Una asignatura con horarios y tarifa, en el formato de la ficha. 404 si no existe. */
+function asignaturaPorId(db, id) {
+  const a = db.prepare(`SELECT a.*, t.nombre AS tipo_clase, t.pago_por_dia, t.pago_mensual
+                        FROM asignaturas a LEFT JOIN tipos_clase t ON t.id = a.tipo_clase_id WHERE a.id = ?`).get(id);
+  if (!a) throw new HttpError(404, 'Esa asignatura no existe.', 'ASIGNATURA_NO_EXISTE');
+  a.horarios = db.prepare(`SELECT dia_semana AS dia, hora_inicio AS inicio, hora_fin AS fin FROM horarios
+                           WHERE asignatura_id = ? ORDER BY dia_semana, hora_inicio`).all(id);
+  return { ...asignaturaDetalle(a), docenteId: a.docente_id, periodoId: a.periodo_id, editadoAMano: leerJson(a.editado_a_mano, []) };
+}
+
 // ------------------------------------------------------------------ resumen y CV
 
 /** Hover: nómina, contratos y CRN del semestre actual. */
@@ -375,4 +385,4 @@ function archivoCv(db, id) {
   return { ruta, nombre: cv.nombre_original };
 }
 
-module.exports = { listar, filtrarBasico, booleano, detalle, resumen, archivoCv, obtenerDocente, armarFila, contexto, COMPARAR_NOMBRE };
+module.exports = { listar, filtrarBasico, booleano, detalle, asignaturaPorId, resumen, archivoCv, obtenerDocente, armarFila, contexto, COMPARAR_NOMBRE };
