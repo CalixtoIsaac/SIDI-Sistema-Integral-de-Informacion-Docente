@@ -12,6 +12,8 @@ const lector = require('../lib/excel/lectores/grupos');
 const config = require('../lib/configuracion');
 const periodosService = require('./periodosService');
 const { crearAlmacen } = require('../lib/previews');
+const bajaService = require('./bajaService');
+const { HttpError } = require('../lib/errores');
 
 const previews = crearAlmacen('grupos');
 
@@ -28,7 +30,7 @@ function nombreDe(d) {
 
 /** Compara lo leído con la BD: qué es nuevo, qué cambia y qué ya no viene. */
 function compararConBd(db, leido, periodoBd) {
-  const docentesBd = new Map(db.prepare('SELECT id, nomina, nombres, apellido_paterno, apellido_materno, recontratable FROM docentes').all()
+  const docentesBd = new Map(db.prepare('SELECT id, nomina, nombres, apellido_paterno, apellido_materno, activo, recontratable FROM docentes').all()
     .map((d) => [d.nomina, d]));
   const asigBd = periodoBd
     ? db.prepare(`SELECT a.id, a.crn, a.num_contrato, d.nomina FROM asignaturas a JOIN docentes d ON d.id = a.docente_id
@@ -57,6 +59,12 @@ function compararConBd(db, leido, periodoBd) {
     sinContrato: leido.asignaturas.filter((a) => !asigPorCrn.get(a.crn)?.num_contrato).length,
     noRecontratables: leido.docentes.filter((d) => docentesBd.get(d.nomina)?.recontratable === 0)
       .map((d) => ({ nomina: d.nomina, nombre: nombreDe(d) })),
+    // Docentes dados de baja que vuelven a venir en el archivo (no se reactivan solos)
+    reaparecenInactivos: leido.docentes.filter((d) => docentesBd.get(d.nomina)?.activo === 0)
+      .map((d) => {
+        const bd = docentesBd.get(d.nomina);
+        return { id: bd.id, nomina: d.nomina, nombre: nombreDe(d), recontratable: bd.recontratable === null ? null : bd.recontratable === 1 };
+      }),
   };
 }
 
@@ -186,24 +194,38 @@ function guardarAsignaturas(db, periodoId, asignaturas, idsDocentes) {
   return cuenta;
 }
 
-/** Da de baja a los docentes ausentes, con un registro en docente_bajas (motivo 'Otro'). */
-function inactivar(db, docentes, periodo) {
-  const baja = db.prepare(`INSERT INTO docente_bajas (docente_id, periodo_id, motivo, observaciones, recontratable)
-                           VALUES (?, ?, 'Otro', ?, 1)`);
-  const desactivar = db.prepare("UPDATE docentes SET activo = 0, recontratable = 1, actualizado_en = datetime('now','localtime') WHERE id = ?");
-  for (const d of docentes) {
-    baja.run(d.id, periodo.id, `No aparece en el Excel de grupos de ${periodo.clave}.`);
-    desactivar.run(d.id);
-  }
+/**
+ * Da de baja a los docentes ausentes con el motivo y "recontratable" que eligió la coordinadora
+ * (HU-21: motivo, observaciones y recontratable son obligatorios). Si no manda observaciones
+ * se usa "No aparece en el Excel de grupos de <periodo>.".
+ */
+function inactivar(db, docentes, baja) {
+  for (const d of docentes) bajaService.registrarBaja(db, d.id, baja);
   return docentes.length;
 }
 
+/** Valida los datos de baja para los ausentes (solo si se pidió inactivarlos). */
+function bajaParaAusentes(db, body, periodoClave) {
+  if (!body.inactivarAusentes) return null;
+  if (!body.baja) {
+    throw new HttpError(400, 'Para dar de baja a los ausentes indica motivo y si son recontratables.', 'BAJA_INCOMPLETA', [
+      { campo: 'baja.motivo', problema: 'OBLIGATORIO' }, { campo: 'baja.recontratable', problema: 'OBLIGATORIO' },
+    ]);
+  }
+  return bajaService.validarBaja(db, {
+    ...body.baja,
+    observaciones: String(body.baja.observaciones ?? '').trim() || `No aparece en el Excel de grupos de ${periodoClave}.`,
+  });
+}
+
 /**
- * Aplica la vista previa. body = { previewId, inactivarAusentes = false }.
+ * Aplica la vista previa.
+ * body = { previewId, inactivarAusentes = false, baja: { motivo, observaciones?, recontratable } }.
  * Devuelve { importacion, periodo, docentesNuevos, gruposNuevos, gruposActualizados, inactivados, omitidos }.
  */
 function confirm(db, body = {}) {
   const { leido, archivo } = previews.obtener(body.previewId);
+  const baja = bajaParaAusentes(db, body, leido.periodo.clave);
   const ejecutar = db.transaction(() => {
     const periodoId = periodosService.asegurar(db, leido.periodo);
     const periodo = { id: periodoId, clave: leido.periodo.clave };
@@ -211,7 +233,7 @@ function confirm(db, body = {}) {
     const docentes = leido.docentes.map((d) => ({ ...d, nivelImparte: nivelImparte(leido.asignaturas, d.nomina) }));
     const { ids, nuevos } = guardarDocentes(db, docentes);
     const cuenta = guardarAsignaturas(db, periodoId, leido.asignaturas, ids);
-    const inactivados = inactivar(db, sugeridosInactivo, periodo);
+    const inactivados = baja ? inactivar(db, sugeridosInactivo, baja) : 0;
     const imp = db.prepare(`INSERT INTO grupos_importaciones (periodo_id, archivo, filas, crn, docentes)
                             VALUES (?, ?, ?, ?, ?)`)
       .run(periodoId, archivo, leido.filas, leido.asignaturas.length, leido.docentes.length);

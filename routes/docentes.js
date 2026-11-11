@@ -5,10 +5,15 @@
  *  GET /api/docentes/:id          → { docente }  ficha extendida (HU-04)
  *  GET /api/docentes/:id/resumen  → { resumen }  hover (HU-04)
  *  GET /api/docentes/:id/cv       → PDF del CV · 404 si no tiene (HU-04)
+ *  GET /api/docentes/motivos-baja → { motivos: [{ motivo, recontratableSugerido }] } (HU-21)
+ *  PATCH /api/docentes/:id/estatus → dar de baja { activo:false, motivo, observaciones, recontratable }
+ *                                   o reactivar { activo:true, confirmarNoRecontratable } (HU-05, HU-21)
+ *  GET /api/docentes/:id/bajas    → { bajas } historial (HU-21)
  */
 const express = require('express');
 const db = require('../lib/db');
 const docentesService = require('../services/docentesService');
+const bajaService = require('../services/bajaService');
 const { HttpError, manejarErrores } = require('../lib/errores');
 
 const router = express.Router();
@@ -22,7 +27,11 @@ router.param('id', (req, res, next, valor) => {
 });
 
 router.get('/', (req, res) => {
-  res.json(docentesService.listar(db, req.query));
+  res.json(docentesService.listar(db, req.query, { filtrar: docentesService.filtrarBasico }));
+});
+
+router.get('/motivos-baja', (req, res) => {
+  res.json({ motivos: bajaService.motivosBaja(db) });
 });
 
 router.get('/:id', (req, res) => {
@@ -38,6 +47,14 @@ router.get('/:id/cv', (req, res, next) => {
   res.type('application/pdf');
   res.set('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(nombre)}`);
   res.sendFile(ruta, (err) => err && next(err));
+});
+
+router.patch('/:id/estatus', (req, res) => {
+  res.json(bajaService.cambiarEstatus(db, req.docenteId, req.body));
+});
+
+router.get('/:id/bajas', (req, res) => {
+  res.json({ bajas: bajaService.historial(db, req.docenteId) });
 });
 
 router.use(manejarErrores);
