@@ -19,6 +19,10 @@
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.5.0",
+    "pdf-parse": "^2.4.5",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "pdf-lib": "^1.17.1"
   }
 }
