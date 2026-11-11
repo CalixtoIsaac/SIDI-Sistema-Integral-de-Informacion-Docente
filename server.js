@@ -43,6 +43,8 @@ app.use('/api/opina', require('./routes/opina'));
 app.use('/api/docentes', require('./routes/docentes'));
 app.use('/api/titulos', require('./routes/titulos'));
 app.use('/api/asignaturas', require('./routes/asignaturas'));
+app.use('/api/tipos-clase', require('./routes/catalogos').tiposClase);
+app.use('/api/catalogos', require('./routes/catalogos').catalogos);
 
 // ---------- API protegida: todo lo que sigue requiere sesión ----------
 app.use('/api', requireAuth);
