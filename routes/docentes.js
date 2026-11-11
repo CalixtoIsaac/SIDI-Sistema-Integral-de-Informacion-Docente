@@ -3,6 +3,7 @@
  *
  *  GET /api/docentes              → { docentes, total, page, limit, periodo, periodoOpina }   (HU-03)
  *                                   ?search= nombre, CURP, nómina (con o sin L0) o CRN (HU-07)
+ *                                   filtros y orden de HU-06 (ver services/filtrosDocentes.js)
  *  GET /api/docentes/:id          → { docente }  ficha extendida (HU-04)
  *  GET /api/docentes/:id/resumen  → { resumen }  hover (HU-04)
  *  GET /api/docentes/:id/cv       → PDF del CV · 404 si no tiene (HU-04)
@@ -41,7 +42,7 @@ router.param('id', (req, res, next, valor) => {
 });
 
 router.get('/', (req, res) => {
-  res.json(docentesService.listar(db, req.query, { filtrar: filtros.filtrar }));
+  res.json(docentesService.listar(db, req.query, { filtrar: filtros.filtrar, comparar: filtros.comparador(req.query) }));
 });
 
 router.get('/motivos-baja', (req, res) => {
