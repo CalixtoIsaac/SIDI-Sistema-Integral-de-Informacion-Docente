@@ -45,6 +45,7 @@ app.use('/api/titulos', require('./routes/titulos'));
 app.use('/api/asignaturas', require('./routes/asignaturas'));
 app.use('/api/tipos-clase', require('./routes/catalogos').tiposClase);
 app.use('/api/catalogos', require('./routes/catalogos').catalogos);
+app.use('/api/contratos', require('./routes/contratos'));
 
 // ---------- API protegida: todo lo que sigue requiere sesión ----------
 app.use('/api', requireAuth);
