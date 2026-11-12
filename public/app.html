@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi Proyecto</title>
+  <title>SIDI · Sistema Integral de Información Docente</title>
 
+  <!-- Aplica modo y color principal ANTES de pintar (03 §3) -->
   <script src="/js/theme.js"></script>
-  <!-- Sin sesión, de vuelta al login antes de pintar nada -->
-  <script>try { if (!localStorage.getItem('app.token')) location.replace('/'); } catch (e) { location.replace('/'); }</script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,33 +14,38 @@
   <link rel="stylesheet" href="/css/theme.css">
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/sidi.css">
 </head>
 <body>
+  <a class="skip-link" href="#view">Saltar al contenido</a>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar" aria-label="Menú principal">
       <div class="sidebar-brand">
         <span class="brand-mark sm" aria-hidden="true"><span data-icon="logo"></span></span>
-        <span class="brand-name">Mi Proyecto</span>
+        <span class="brand-text">
+          <span class="brand-name">SIDI</span>
+          <span class="brand-sub">Información Docente</span>
+        </span>
       </div>
 
       <nav class="sidebar-nav">
-        <p class="nav-section">General</p>
-        <a class="nav-link" href="#inicio" data-view="inicio"><span data-icon="home"></span>Inicio</a>
-        <a class="nav-link" href="#notas" data-view="notas"><span data-icon="notes"></span>Notas</a>
-        <!-- Agrega aquí los enlaces de tus módulos nuevos -->
+        <a class="nav-link" href="#panel" data-view="panel"><span data-icon="chart"></span>Panel</a>
+        <a class="nav-link" href="#docentes" data-view="docentes"><span data-icon="users"></span>Docentes</a>
+        <a class="nav-link" href="#faltas" data-view="faltas"><span data-icon="calendar"></span>Faltas</a>
+        <a class="nav-link" href="#incidencias" data-view="incidencias"><span data-icon="cash"></span>Incidencias</a>
+        <a class="nav-link" href="#opina" data-view="opina"><span data-icon="star"></span>OPINA</a>
+        <a class="nav-link" href="#reportes" data-view="reportes"><span data-icon="file"></span>Reportes</a>
+        <a class="nav-link" href="#configuracion" data-view="configuracion"><span data-icon="settings"></span>Configuración</a>
       </nav>
 
       <div class="sidebar-footer">
-        <div class="user-chip">
-          <span class="avatar" id="userAvatar" aria-hidden="true"></span>
-          <div class="user-meta">
-            <strong id="userName"></strong>
-            <span id="userHandle" class="muted"></span>
-          </div>
-        </div>
-        <button class="btn btn-ghost btn-block nav-logout" id="logoutBtn" type="button">
-          <span data-icon="logout"></span>Cerrar sesión
-        </button>
+        <a class="nav-link user-link" href="#perfil" data-view="perfil">
+          <span class="avatar" id="perfilAvatar" aria-hidden="true"></span>
+          <span class="user-meta">
+            <strong id="perfilNombre">Coordinación de Docentes</strong>
+            <span class="muted">Perfil y apariencia</span>
+          </span>
+        </a>
       </div>
     </aside>
 
@@ -53,8 +57,14 @@
                 aria-label="Abrir menú" aria-controls="sidebar" aria-expanded="false">
           <span data-icon="menu"></span>
         </button>
-        <h1 class="topbar-title" id="pageTitle">Inicio</h1>
+        <h1 class="topbar-title" id="pageTitle">Panel</h1>
         <div class="topbar-actions">
+          <label class="search topbar-search">
+            <span class="sr-only">Buscar docente por nombre, CURP, nómina o CRN</span>
+            <span data-icon="search"></span>
+            <input class="input" type="search" id="busquedaGlobal" autocomplete="off"
+                   placeholder="Buscar: nombre, CURP, nómina o CRN">
+          </label>
           <button class="btn btn-ghost btn-icon" type="button" data-theme-toggle></button>
         </div>
       </header>
@@ -63,10 +73,15 @@
     </div>
   </div>
 
-  <!-- Orden de carga: utilidades → módulos → app.js (que los registra) -->
+  <!-- Orden de carga: utilidades → vistas → app.js (que las registra) -->
   <script src="/js/ui-kit.js"></script>
-  <script src="/js/notas.js"></script>
-  <script src="/js/inicio.js"></script>
+  <script src="/js/panel.js"></script>
+  <script src="/js/docente-form.js"></script>
+  <script src="/js/importar.js"></script>
+  <script src="/js/docentes.js"></script>
+  <script src="/js/opina.js"></script>
+  <script src="/js/catalogos.js"></script>
+  <script src="/js/perfil.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>
