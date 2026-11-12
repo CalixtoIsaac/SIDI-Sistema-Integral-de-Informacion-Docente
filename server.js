@@ -41,6 +41,7 @@ app.use('/api/asignaturas', require('./routes/asignaturas'));
 app.use('/api/tipos-clase', require('./routes/catalogos').tiposClase);
 app.use('/api/catalogos', require('./routes/catalogos').catalogos);
 app.use('/api/contratos', require('./routes/contratos'));
+app.use('/api/configuracion', require('./routes/configuracion'));
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta de la API no encontrada.' }));
 
