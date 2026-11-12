@@ -8,16 +8,13 @@ const path = require('path');
 const express = require('express');
 
 const db = require('./lib/db');
-const { requireAuth } = require('./lib/auth');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const HOST = process.env.HOST || '127.0.0.1';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
 app.disable('x-powered-by');
-// Si lo pones detrás de un proxy inverso (Nginx, Caddy), descomenta para que
-// el limitador de intentos vea la IP real del cliente:
-// app.set('trust proxy', 1);
 
 // Cabeceras de seguridad básicas
 app.use((req, res, next) => {
@@ -31,11 +28,9 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '1mb' }));
 
-// ---------- API pública ----------
 app.get('/api/health', (req, res) => {
   res.json({ status: 'online', timestamp: new Date().toISOString() });
 });
-app.use('/api/auth', require('./routes/auth'));
 
 // ---------- SIDI (sin login, 03 §1) ----------
 app.use('/api/grupos', require('./routes/grupos'));
@@ -47,18 +42,12 @@ app.use('/api/tipos-clase', require('./routes/catalogos').tiposClase);
 app.use('/api/catalogos', require('./routes/catalogos').catalogos);
 app.use('/api/contratos', require('./routes/contratos'));
 
-// ---------- API protegida: todo lo que sigue requiere sesión ----------
-app.use('/api', requireAuth);
-app.use('/api/notas', require('./routes/notas'));
-// Registra aquí tus módulos nuevos, por ejemplo:
-// app.use('/api/clientes', require('./routes/clientes'));
-
 app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta de la API no encontrada.' }));
 
 // ---------- Páginas ----------
 app.use(express.static(PUBLIC_DIR, { index: false }));
-app.get('/', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'login.html')));
-app.get('/app', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'app.html')));
+// Sin login (03 §1): se abre directo en la app. /app se conserva por los enlaces viejos.
+app.get(['/', '/app'], (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'app.html')));
 
 // ---------- Manejo de errores ----------
 // eslint-disable-next-line no-unused-vars
@@ -73,8 +62,8 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Error interno del servidor.' });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`✔ Servidor listo en http://localhost:${PORT}`);
+const server = app.listen(PORT, HOST, () => {
+  console.log(`✔ SIDI listo en http://localhost:${PORT}`);
   console.log(`  Base de datos: ${db.DB_PATH}`);
 });
 
