@@ -21,10 +21,10 @@ const ENCABEZADOS_GRUPOS = [
 ];
 
 /** Fila del Excel de grupos. dias = 'LMXJV' con las letras de los días que aplica. */
-function filaGrupo({ clave, materia, crn, grupo, modalidad = 'Teórica', nomina, profesor, dias, inicio, fin, campus = 'Veracruz' }) {
+function filaGrupo({ clave, materia, crn, grupo, modalidad = 'Teórica', nomina, profesor, dias, inicio, fin, campus = 'Veracruz', periodo = '2026 Ago - Dic' }) {
   const marca = (letra) => (dias.includes(letra) ? 'SI' : null);
   return [
-    campus, '2026 Ago - Dic', 'Preparatoria', clave, materia, crn, grupo, modalidad, nomina, profesor,
+    campus, periodo, 'Preparatoria', clave, materia, crn, grupo, modalidad, nomina, profesor,
     marca('L'), marca('M'), marca('X'), marca('J'), marca('V'), inicio, fin,
   ];
 }

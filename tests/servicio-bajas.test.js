@@ -74,3 +74,13 @@ test('filtros de la tabla: activo y recontratable', () => {
   assert.deepEqual(listar({ recontratable: 'false' }), ['L03500003']);
   assert.equal(listar({}).length, 4);
 });
+
+test('baja manual desde la ficha: sin periodo explícito queda en el periodo actual', () => {
+  const { db, ids } = crearEscenario();
+  db.prepare("INSERT INTO periodos (clave, etiqueta_opina, fecha_inicio, fecha_fin) VALUES ('ENE-MAY 2027', '2027 Ene - May', '2027-01-01', '2027-05-31')").run();
+  const r = bajaService.cambiarEstatus(db, ids.maria, BAJA);
+  assert.equal(r.baja.periodo, 'AGO-DIC 2026');
+  const otroPeriodo = db.prepare("SELECT id FROM periodos WHERE clave = 'ENE-MAY 2027'").get().id;
+  bajaService.registrarBaja(db, ids.ana, { motivo: 'Renuncia', observaciones: 'x', recontratable: true }, otroPeriodo);
+  assert.equal(bajaService.historial(db, ids.ana)[0].periodo, 'ENE-MAY 2027');
+});
