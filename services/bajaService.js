@@ -48,12 +48,15 @@ function ultimaBaja(db, id) {
   return db.prepare('SELECT * FROM docente_bajas WHERE docente_id = ? ORDER BY fecha DESC, id DESC LIMIT 1').get(id) ?? null;
 }
 
-/** Registra la baja sin validar (lo usan suspender y la importación de grupos). */
-function registrarBaja(db, id, baja) {
-  const periodo = periodosService.actualOUltimo(db);
+/**
+ * Registra la baja sin validar (lo usan suspender y la importación de grupos).
+ * `periodoId` = semestre de la baja: el del Excel importado cuando viene de la importación;
+ * si no se manda, el periodo actual (baja manual desde la ficha).
+ */
+function registrarBaja(db, id, baja, periodoId = periodosService.actualOUltimo(db)?.id ?? null) {
   const r = db.prepare(`INSERT INTO docente_bajas (docente_id, periodo_id, motivo, observaciones, recontratable)
                         VALUES (?, ?, ?, ?, ?)`)
-    .run(id, periodo?.id ?? null, baja.motivo, baja.observaciones, baja.recontratable ? 1 : 0);
+    .run(id, periodoId, baja.motivo, baja.observaciones, baja.recontratable ? 1 : 0);
   db.prepare(`UPDATE docentes SET activo = 0, recontratable = ?, actualizado_en = datetime('now','localtime')
               WHERE id = ?`).run(baja.recontratable ? 1 : 0, id);
   return Number(r.lastInsertRowid);

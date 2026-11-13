@@ -108,3 +108,36 @@ test('avisa docentes no recontratables', () => {
   const p = gruposService.preview(db, archivo());
   assert.deepEqual(p.noRecontratables.map((d) => d.nomina), ['L03500005']);
 });
+
+test('dar de baja a ausentes: la baja queda en el periodo del ARCHIVO, no en el actual (dos periodos)', () => {
+  const db = crearBd();
+  // Periodo actual: AGO-DIC 2026
+  gruposService.confirm(db, { previewId: gruposService.preview(db, archivo()).previewId });
+  db.prepare("UPDATE periodos SET actual = 1 WHERE clave = 'AGO-DIC 2026'").run();
+
+  // Se importa el semestre siguiente (ENE-MAY 2027) con dos docentes…
+  const fila = (crn, nomina, profesor) => filaGrupo({
+    clave: 'BSMA2001', materia: 'Matemáticas II', crn, grupo: '611', nomina, profesor,
+    dias: 'LJ', inicio: '07:30', fin: '08:59', periodo: '2027 Ene - May',
+  });
+  const enero = (filas) => ({ buffer: libro({ Salida: [ENCABEZADOS_GRUPOS, ...filas] }), nombre: 'GRUPOS_ENE-MAY_2027.xlsx' });
+  gruposService.confirm(db, {
+    previewId: gruposService.preview(db, enero([
+      fila('20001', 'L03500001', 'López Ruiz  María'),
+      fila('20002', 'L03500002', 'Sosa Von Putlitz  Guillermo'),
+    ])).previewId,
+  });
+
+  // …y se reimporta ENE-MAY 2027 sin Guillermo, dando de baja al ausente
+  const p = gruposService.preview(db, enero([fila('20001', 'L03500001', 'López Ruiz  María')]));
+  assert.deepEqual(p.sugeridosInactivo.map((d) => d.nomina), ['L03500002']);
+  gruposService.confirm(db, {
+    previewId: p.previewId, inactivarAusentes: true, baja: { motivo: 'Sin disponibilidad de horario', recontratable: true },
+  });
+
+  const baja = db.prepare(`SELECT p.clave AS periodo, b.observaciones FROM docente_bajas b
+                           JOIN periodos p ON p.id = b.periodo_id
+                           JOIN docentes d ON d.id = b.docente_id WHERE d.nomina = 'L03500002'`).get();
+  assert.equal(baja.periodo, 'ENE-MAY 2027'); // antes quedaba en AGO-DIC 2026 (el actual)
+  assert.equal(baja.observaciones, 'No aparece en el Excel de grupos de ENE-MAY 2027.');
+});
