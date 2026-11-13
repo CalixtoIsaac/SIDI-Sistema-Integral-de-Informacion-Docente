@@ -7,8 +7,17 @@
  */
 const { HttpError } = require('../lib/errores');
 const color = require('../lib/color');
-const { CONFIGURACION } = require('../lib/semillas');
 const { POR_DEFECTO } = require('../lib/configuracion');
+
+/** Valores por defecto propios del perfil (no dependen de lib/semillas.js, que es de BD). */
+const DEFECTOS = {
+  ...POR_DEFECTO,
+  'tema.modo': 'automatico',
+  'tema.color': '#DB2777',
+  'perfil.nombre': 'Coordinación de Docentes',
+  'opina.top_n': '10',
+  'reportes.agrupar_suplencias': '1',
+};
 
 const MODOS = ['claro', 'oscuro', 'automatico'];
 
@@ -34,7 +43,7 @@ const VALIDAR = {
 
 function listar(db) {
   const guardadas = Object.fromEntries(db.prepare('SELECT clave, valor FROM configuracion').all().map((f) => [f.clave, f.valor]));
-  return { ...POR_DEFECTO, ...CONFIGURACION, ...guardadas };
+  return { ...DEFECTOS, ...guardadas };
 }
 
 function actualizar(db, body = {}) {
