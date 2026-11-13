@@ -199,8 +199,8 @@ function guardarAsignaturas(db, periodoId, asignaturas, idsDocentes) {
  * (HU-21: motivo, observaciones y recontratable son obligatorios). Si no manda observaciones
  * se usa "No aparece en el Excel de grupos de <periodo>.".
  */
-function inactivar(db, docentes, baja) {
-  for (const d of docentes) bajaService.registrarBaja(db, d.id, baja);
+function inactivar(db, docentes, periodoId, baja) {
+  for (const d of docentes) bajaService.registrarBaja(db, d.id, baja, periodoId);
   return docentes.length;
 }
 
@@ -233,7 +233,7 @@ function confirm(db, body = {}) {
     const docentes = leido.docentes.map((d) => ({ ...d, nivelImparte: nivelImparte(leido.asignaturas, d.nomina) }));
     const { ids, nuevos } = guardarDocentes(db, docentes);
     const cuenta = guardarAsignaturas(db, periodoId, leido.asignaturas, ids);
-    const inactivados = baja ? inactivar(db, sugeridosInactivo, baja) : 0;
+    const inactivados = baja ? inactivar(db, sugeridosInactivo, periodoId, baja) : 0;
     const imp = db.prepare(`INSERT INTO grupos_importaciones (periodo_id, archivo, filas, crn, docentes)
                             VALUES (?, ?, ?, ?, ?)`)
       .run(periodoId, archivo, leido.filas, leido.asignaturas.length, leido.docentes.length);
