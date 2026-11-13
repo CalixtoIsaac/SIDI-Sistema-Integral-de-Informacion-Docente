@@ -1,7 +1,6 @@
 /**
  * BD SQLite en memoria para las pruebas de servicios.
- * Usa TODAS las migraciones de lib/migraciones/ (001, 002, 003…) en orden, igual que lib/db.js;
- * si no hay ninguna, el DDL de context/04_Modelo_Datos.md §4.
+ * Usa lib/migraciones/001_inicial.sql si ya existe; si no, el DDL de context/04_Modelo_Datos.md §4.
  */
 const fs = require('fs');
 const path = require('path');
@@ -10,13 +9,8 @@ const Database = require('better-sqlite3');
 const RAIZ = path.join(__dirname, '..', '..');
 
 function ddl() {
-  const dirMigraciones = path.join(RAIZ, 'lib', 'migraciones');
-  const migraciones = fs.existsSync(dirMigraciones)
-    ? fs.readdirSync(dirMigraciones).filter((f) => /^\d+.*\.sql$/.test(f)).sort()
-    : [];
-  if (migraciones.length) {
-    return migraciones.map((f) => fs.readFileSync(path.join(dirMigraciones, f), 'utf8')).join('\n');
-  }
+  const migracion = path.join(RAIZ, 'lib', 'migraciones', '001_inicial.sql');
+  if (fs.existsSync(migracion)) return fs.readFileSync(migracion, 'utf8');
   const doc = fs.readFileSync(path.join(RAIZ, 'context', '04_Modelo_Datos.md'), 'utf8');
   const seccion = doc.slice(doc.indexOf('## 4. DDL'));
   const m = seccion.match(/```sql\r?\n([\s\S]*?)```/);

@@ -6,9 +6,6 @@ data/*.db
 data/*.db-shm
 data/*.db-wal
 
-# PDF de los CV de los docentes (datos personales: nunca van a git)
-data/cv/
-
 npm-debug.log*
 .DS_Store
 Thumbs.db
