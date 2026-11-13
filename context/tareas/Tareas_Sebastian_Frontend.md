@@ -2,6 +2,8 @@
 
 > Generado a partir de `context/02_Product_Backlog.md` v2.4.3 (§2 y §3) y `scripts/github/issues.tsv`. Si cambia el backlog, se actualiza primero el backlog y después este archivo.
 
+> **12/11/2026:** estas tareas las cubre **Isaac**. Sprint 1 terminado en la rama `feature/sprint1-frontend` (PR a `develop`).
+
 **Rol:** Frontend (apoyo en Backend) · **Label en GitHub:** `area:frontend` · **Historias en las que participa:** 24 · **Puntos involucrados:** 118
 
 ## 1. Historias asignadas
@@ -46,18 +48,18 @@
 
 | Día | Fecha | HU | Tarea | Estado |
 |---|---|---|---|---|
-| D1 | mar 03/11 | HU-00 | Layout, menú y tema rosa base | ⬜ |
-| D2 | mié 04/11 | HU-02 | Pantalla de carga del Excel de grupos con vista previa | ⬜ |
-| D2 | mié 04/11 | HU-08 | Pantalla de carga de OPINA con vista previa (filas descartadas) | ⬜ |
-| D3 | jue 05/11 | HU-20 | Carga de CV con tabla de revisión editable | ⬜ |
-| D3 | jue 05/11 | HU-01 | Formulario de docente en pasos (y alta rápida) | ⬜ |
-| D4 | vie 06/11 | HU-03 | Tabla de docentes con selector de columnas | ⬜ |
-| D4 | vie 06/11 | HU-04 | Resumen al pasar el mouse; ficha con pestañas (**tarifa mensual** a la derecha de la diaria) y botón Ver CV | ⬜ |
-| D4 | vie 06/11 | HU-05 | Punto verde/gris de estatus | ⬜ |
-| D4 | vie 06/11 | HU-21 | Modal de baja e insignia "Recontratable" | ⬜ |
-| D5 | lun 09/11 | HU-06 · HU-07 | Filtros con chips (incluye Recontratable) y búsqueda mientras se escribe | ⬜ |
-| D5 | lun 09/11 | HU-17 | Perfil: color principal y modo claro/oscuro/automático | ⬜ |
-| D5 | lun 09/11 | HU-18 · HU-27 | Configuración: tarifas, catálogos, contratos y motivos de baja | ⬜ |
+| D1 | mar 03/11 | HU-00 | Layout, menú y tema rosa base | 👀 |
+| D2 | mié 04/11 | HU-02 | Pantalla de carga del Excel de grupos con vista previa | 👀 |
+| D2 | mié 04/11 | HU-08 | Pantalla de carga de OPINA con vista previa (filas descartadas) | 👀 |
+| D3 | jue 05/11 | HU-20 | Carga de CV con tabla de revisión editable | 👀 |
+| D3 | jue 05/11 | HU-01 | Formulario de docente en pasos (y alta rápida) | 👀 |
+| D4 | vie 06/11 | HU-03 | Tabla de docentes con selector de columnas | 👀 |
+| D4 | vie 06/11 | HU-04 | Resumen al pasar el mouse; ficha con pestañas (**tarifa mensual** a la derecha de la diaria) y botón Ver CV | 👀 |
+| D4 | vie 06/11 | HU-05 | Punto verde/gris de estatus | 👀 |
+| D4 | vie 06/11 | HU-21 | Modal de baja e insignia "Recontratable" | 👀 |
+| D5 | lun 09/11 | HU-06 · HU-07 | Filtros con chips (incluye Recontratable) y búsqueda mientras se escribe | 👀 |
+| D5 | lun 09/11 | HU-17 | Perfil: color principal y modo claro/oscuro/automático | 👀 |
+| D5 | lun 09/11 | HU-18 · HU-27 | Configuración: tarifas, catálogos, contratos y motivos de baja | 👀 |
 | D5 | lun 09/11 | D5 | Revisión del Sprint 1 con Saraí: demostrar lo terminado | ⬜ |
 
 ### Sprint 2 — Faltas, reportes de Nacional y analítica (D6–D10 · 10/11 → 17/11)
