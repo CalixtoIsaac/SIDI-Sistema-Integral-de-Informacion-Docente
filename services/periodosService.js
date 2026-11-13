@@ -28,4 +28,11 @@ function actual(db) {
   return db.prepare('SELECT * FROM periodos WHERE actual = 1').get() ?? null;
 }
 
-module.exports = { buscar, asegurar, actual };
+/** Periodo actual; si ninguno está marcado, el más reciente por fecha de inicio. */
+function actualOUltimo(db) {
+  return actual(db)
+    ?? db.prepare('SELECT * FROM periodos ORDER BY fecha_inicio DESC, id DESC LIMIT 1').get()
+    ?? null;
+}
+
+module.exports = { buscar, asegurar, actual, actualOUltimo };

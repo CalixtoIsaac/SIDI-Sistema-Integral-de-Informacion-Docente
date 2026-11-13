@@ -25,12 +25,24 @@ const TARIFAS = [
   ['Clase de 1.5 hrs en español', 1.5, 'ES', 3528, 26], ['Clase de 1.5 hrs en inglés', 1.5, 'EN', 4234, 32],
 ];
 
+const CATALOGOS = [
+  ['nivel_estudios', 'Licenciatura', null, 1], ['nivel_estudios', 'Especialidad', null, 2],
+  ['nivel_estudios', 'Maestría', null, 3], ['nivel_estudios', 'Doctorado', null, 4],
+  ['motivo_baja', 'Sin disponibilidad de horario', '1', 1], ['motivo_baja', 'Renuncia', '1', 2],
+  ['motivo_baja', 'No cumplió expectativas', '0', 3], ['motivo_baja', 'Problemas de conducta o disciplina', '0', 4],
+  ['motivo_baja', 'Otro', null, 5],
+];
+
 function crearBd() {
   const db = new Database(':memory:');
   db.pragma('foreign_keys = ON');
   db.exec(ddl());
-  const t = db.prepare('INSERT INTO tipos_clase (nombre, horas_semana, idioma, pago_semestre, pago_por_dia) VALUES (?, ?, ?, ?, ?)');
-  for (const fila of TARIFAS) t.run(...fila);
+  if (db.prepare('SELECT COUNT(*) n FROM tipos_clase').get().n === 0) {
+    const t = db.prepare('INSERT INTO tipos_clase (nombre, horas_semana, idioma, pago_semestre, pago_por_dia) VALUES (?, ?, ?, ?, ?)');
+    for (const fila of TARIFAS) t.run(...fila);
+  }
+  const c = db.prepare('INSERT OR IGNORE INTO catalogos (tipo, valor, descripcion, orden) VALUES (?, ?, ?, ?)');
+  for (const fila of CATALOGOS) c.run(...fila);
   return db;
 }
 
