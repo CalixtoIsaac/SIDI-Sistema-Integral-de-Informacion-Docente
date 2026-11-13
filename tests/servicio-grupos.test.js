@@ -75,12 +75,30 @@ test('detecta cambio de docente, grupos que ya no vienen y ausentes', () => {
   assert.equal(p.grupos.yaNoVienen.length, 4);
   assert.deepEqual(p.sugeridosInactivo.map((d) => d.nomina).sort(), ['L03500001', 'L03500003', 'L03500005']);
 
-  const r = gruposService.confirm(db, { previewId: p.previewId, inactivarAusentes: true });
+  // HU-21: dar de baja a los ausentes exige motivo y recontratable
+  assert.throws(() => gruposService.confirm(db, { previewId: p.previewId, inactivarAusentes: true }), { status: 400, code: 'BAJA_INCOMPLETA' });
+  assert.throws(
+    () => gruposService.confirm(db, { previewId: p.previewId, inactivarAusentes: true, baja: { motivo: 'Inventado', recontratable: true } }),
+    (e) => e.status === 400 && e.details.some((d) => d.problema === 'NO_ESTA_EN_CATALOGO'),
+  );
+  const r = gruposService.confirm(db, {
+    previewId: p.previewId, inactivarAusentes: true, baja: { motivo: 'Sin disponibilidad de horario', recontratable: true },
+  });
   assert.equal(r.inactivados, 3);
   const baja = db.prepare(`SELECT b.* FROM docente_bajas b JOIN docentes d ON d.id = b.docente_id WHERE d.nomina = 'L03500001'`).get();
-  assert.equal(baja.motivo, 'Otro');
-  assert.equal(baja.recontratable, 1);
+  assert.deepEqual([baja.motivo, baja.recontratable, baja.observaciones],
+    ['Sin disponibilidad de horario', 1, 'No aparece en el Excel de grupos de AGO-DIC 2026.']);
   assert.equal(db.prepare("SELECT activo FROM docentes WHERE nomina = 'L03500001'").get().activo, 0);
+});
+
+test('avisa docentes inactivos que reaparecen en el archivo (no los reactiva)', () => {
+  const db = crearBd();
+  gruposService.confirm(db, { previewId: gruposService.preview(db, archivo()).previewId });
+  db.prepare("UPDATE docentes SET activo = 0, recontratable = 1 WHERE nomina = 'L03500003'").run();
+  const p = gruposService.preview(db, archivo());
+  assert.deepEqual(p.reaparecenInactivos.map((d) => [d.nomina, d.recontratable]), [['L03500003', true]]);
+  gruposService.confirm(db, { previewId: p.previewId });
+  assert.equal(db.prepare("SELECT activo FROM docentes WHERE nomina = 'L03500003'").get().activo, 0);
 });
 
 test('avisa docentes no recontratables', () => {

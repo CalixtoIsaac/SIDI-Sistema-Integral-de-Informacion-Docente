@@ -2,7 +2,7 @@
  * Carga del Excel de grupos docentes (HU-02).
  *
  *  POST /api/grupos/excel/preview   multipart (archivo) → vista previa, NO guarda
- *  POST /api/grupos/excel/confirm   { previewId, inactivarAusentes } → aplica en una transacción
+ *  POST /api/grupos/excel/confirm   { previewId, inactivarAusentes, baja: { motivo, observaciones?, recontratable } }
  *  GET  /api/grupos/importaciones   → historial
  */
 const express = require('express');
@@ -21,6 +21,7 @@ router.post('/excel/confirm', (req, res) => {
   const resultado = gruposService.confirm(db, {
     previewId: req.body?.previewId,
     inactivarAusentes: req.body?.inactivarAusentes === true,
+    baja: req.body?.baja,
   });
   res.status(201).json(resultado);
 });

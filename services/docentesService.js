@@ -175,6 +175,21 @@ function entero(valor, porDefecto, min, max) {
   return Math.min(Math.max(n, min), max);
 }
 
+/** 'true'/'false' (texto de la query) → booleano; otro valor → undefined (sin filtro). */
+function booleano(valor) {
+  if (valor === true || valor === 'true' || valor === '1') return true;
+  if (valor === false || valor === 'false' || valor === '0') return false;
+  return undefined;
+}
+
+/** Filtros de estatus (HU-05) y recontratable (HU-21). Búsqueda y demás filtros: HU-06/07. */
+function filtrarBasico(filas, query = {}) {
+  const activo = booleano(query.activo);
+  const recontratable = booleano(query.recontratable);
+  return filas.filter((f) => (activo === undefined || f.activo === activo)
+    && (recontratable === undefined || f.recontratable === recontratable));
+}
+
 const COMPARAR_NOMBRE = (a, b) => (`${a.apellidoPaterno} ${a.apellidoMaterno ?? ''} ${a.nombres}`)
   .localeCompare(`${b.apellidoPaterno} ${b.apellidoMaterno ?? ''} ${b.nombres}`, 'es', { sensitivity: 'base' });
 
@@ -360,4 +375,4 @@ function archivoCv(db, id) {
   return { ruta, nombre: cv.nombre_original };
 }
 
-module.exports = { listar, detalle, resumen, archivoCv, obtenerDocente, armarFila, contexto, COMPARAR_NOMBRE };
+module.exports = { listar, filtrarBasico, booleano, detalle, resumen, archivoCv, obtenerDocente, armarFila, contexto, COMPARAR_NOMBRE };
