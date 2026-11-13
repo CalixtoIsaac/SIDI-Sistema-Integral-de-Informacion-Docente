@@ -1,0 +1,37 @@
+/**
+ * Faltas y descuentos (HU-09; 06 §Faltas y descuentos).
+ *
+ *  GET    /api/faltas?quincenaId=&docenteId=&periodoId=&pendientes=true → { faltas, totales }
+ *  POST   /api/faltas/preview   → calcula sin guardar: { filas, totales, sinContrato, sinTarifa, repetidas, segundaSesion }
+ *  POST   /api/faltas           → 201 { faltas, totales }  (una por CRN, día y sesión; transacción)
+ *  GET    /api/faltas/:id       → { falta }
+ *  PUT    /api/faltas/:id       → { falta }  recalcula monto y textos · 423 si la quincena está cerrada
+ *  DELETE /api/faltas/:id       → 204 · 423 si la quincena está cerrada
+ */
+const express = require('express');
+const db = require('../lib/db');
+const faltasService = require('../services/faltasService');
+const { HttpError, manejarErrores } = require('../lib/errores');
+
+const router = express.Router();
+
+router.param('id', (req, res, next, valor) => {
+  const id = Number(valor);
+  if (!Number.isInteger(id) || id <= 0) return next(new HttpError(400, 'Id de falta inválido.', 'ID_INVALIDO'));
+  req.faltaId = id;
+  return next();
+});
+
+router.get('/', (req, res) => res.json(faltasService.listar(db, req.query)));
+router.post('/preview', (req, res) => res.json(faltasService.preview(db, req.body ?? {})));
+router.post('/', (req, res) => res.status(201).json(faltasService.crear(db, req.body ?? {})));
+router.get('/:id', (req, res) => res.json({ falta: faltasService.obtener(db, req.faltaId) }));
+router.put('/:id', (req, res) => res.json({ falta: faltasService.actualizar(db, req.faltaId, req.body ?? {}) }));
+router.delete('/:id', (req, res) => {
+  faltasService.eliminar(db, req.faltaId);
+  res.status(204).end();
+});
+
+router.use(manejarErrores);
+
+module.exports = router;
