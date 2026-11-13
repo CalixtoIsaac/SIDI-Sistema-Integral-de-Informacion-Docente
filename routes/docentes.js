@@ -14,6 +14,8 @@
  *  PUT  /api/docentes/:id         → { docente } edición parcial (HU-01)
  *  POST /api/docentes/:id/titulos     → 201 { titulo } (HU-01)
  *  POST /api/docentes/:id/asignaturas → 201 { asignatura } grupo o actividad (HU-01)
+ *  POST /api/docentes/cv/preview  → multipart (archivos[], hasta 60 PDF de 10 MB) → vista previa (HU-20)
+ *  POST /api/docentes/cv/confirm  → { previewId, items: [{ archivo, docenteId | nomina | omitir, datos }] } (HU-20)
  */
 const express = require('express');
 const db = require('../lib/db');
@@ -22,6 +24,8 @@ const bajaService = require('../services/bajaService');
 const edicionService = require('../services/docentesEdicionService');
 const titulosService = require('../services/titulosService');
 const asignaturasService = require('../services/asignaturasService');
+const cvService = require('../services/cvService');
+const { variosArchivos } = require('../lib/subida');
 const { HttpError, manejarErrores } = require('../lib/errores');
 
 const router = express.Router();
@@ -40,6 +44,14 @@ router.get('/', (req, res) => {
 
 router.get('/motivos-baja', (req, res) => {
   res.json({ motivos: bajaService.motivosBaja(db) });
+});
+
+router.post('/cv/preview', variosArchivos('archivos', { maxMb: 10, maxArchivos: 60 }), (req, res, next) => {
+  cvService.preview(db, req.archivos).then((r) => res.json(r)).catch(next);
+});
+
+router.post('/cv/confirm', (req, res) => {
+  res.status(201).json(cvService.confirm(db, req.body ?? {}));
 });
 
 router.post('/', (req, res) => {
