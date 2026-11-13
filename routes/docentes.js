@@ -2,6 +2,7 @@
  * Docentes (06 §Docentes).
  *
  *  GET /api/docentes              → { docentes, total, page, limit, periodo, periodoOpina }   (HU-03)
+ *                                   ?search= nombre, CURP, nómina (con o sin L0) o CRN (HU-07)
  *  GET /api/docentes/:id          → { docente }  ficha extendida (HU-04)
  *  GET /api/docentes/:id/resumen  → { resumen }  hover (HU-04)
  *  GET /api/docentes/:id/cv       → PDF del CV · 404 si no tiene (HU-04)
@@ -25,6 +26,7 @@ const edicionService = require('../services/docentesEdicionService');
 const titulosService = require('../services/titulosService');
 const asignaturasService = require('../services/asignaturasService');
 const cvService = require('../services/cvService');
+const filtros = require('../services/filtrosDocentes');
 const { variosArchivos } = require('../lib/subida');
 const { HttpError, manejarErrores } = require('../lib/errores');
 
@@ -39,7 +41,7 @@ router.param('id', (req, res, next, valor) => {
 });
 
 router.get('/', (req, res) => {
-  res.json(docentesService.listar(db, req.query, { filtrar: docentesService.filtrarBasico }));
+  res.json(docentesService.listar(db, req.query, { filtrar: filtros.filtrar }));
 });
 
 router.get('/motivos-baja', (req, res) => {
