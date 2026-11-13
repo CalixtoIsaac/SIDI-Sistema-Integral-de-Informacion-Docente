@@ -31,6 +31,7 @@ const CATALOGOS = [
   ['motivo_baja', 'Sin disponibilidad de horario', '1', 1], ['motivo_baja', 'Renuncia', '1', 2],
   ['motivo_baja', 'No cumplió expectativas', '0', 3], ['motivo_baja', 'Problemas de conducta o disciplina', '0', 4],
   ['motivo_baja', 'Otro', null, 5],
+  ['campo_formacion', 'Ingeniería y Tecnología', null, 1], ['campo_formacion', 'Educación', null, 2],
 ];
 
 function crearBd() {

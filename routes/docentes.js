@@ -9,11 +9,19 @@
  *  PATCH /api/docentes/:id/estatus → dar de baja { activo:false, motivo, observaciones, recontratable }
  *                                   o reactivar { activo:true, confirmarNoRecontratable } (HU-05, HU-21)
  *  GET /api/docentes/:id/bajas    → { bajas } historial (HU-21)
+ *  POST /api/docentes             → 201 { docente } alta manual (HU-01)
+ *  POST /api/docentes/alta-rapida → 201 { docente } { nomina, nombre } para suplentes (HU-01)
+ *  PUT  /api/docentes/:id         → { docente } edición parcial (HU-01)
+ *  POST /api/docentes/:id/titulos     → 201 { titulo } (HU-01)
+ *  POST /api/docentes/:id/asignaturas → 201 { asignatura } grupo o actividad (HU-01)
  */
 const express = require('express');
 const db = require('../lib/db');
 const docentesService = require('../services/docentesService');
 const bajaService = require('../services/bajaService');
+const edicionService = require('../services/docentesEdicionService');
+const titulosService = require('../services/titulosService');
+const asignaturasService = require('../services/asignaturasService');
 const { HttpError, manejarErrores } = require('../lib/errores');
 
 const router = express.Router();
@@ -32,6 +40,29 @@ router.get('/', (req, res) => {
 
 router.get('/motivos-baja', (req, res) => {
   res.json({ motivos: bajaService.motivosBaja(db) });
+});
+
+router.post('/', (req, res) => {
+  const id = edicionService.crear(db, req.body ?? {});
+  res.status(201).json({ docente: docentesService.detalle(db, id) });
+});
+
+router.post('/alta-rapida', (req, res) => {
+  const id = edicionService.altaRapida(db, req.body ?? {});
+  res.status(201).json({ docente: docentesService.detalle(db, id) });
+});
+
+router.put('/:id', (req, res) => {
+  edicionService.actualizar(db, req.docenteId, req.body ?? {});
+  res.json({ docente: docentesService.detalle(db, req.docenteId) });
+});
+
+router.post('/:id/titulos', (req, res) => {
+  res.status(201).json({ titulo: titulosService.crear(db, req.docenteId, req.body ?? {}) });
+});
+
+router.post('/:id/asignaturas', (req, res) => {
+  res.status(201).json({ asignatura: asignaturasService.crear(db, req.docenteId, req.body ?? {}) });
 });
 
 router.get('/:id', (req, res) => {

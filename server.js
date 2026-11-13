@@ -41,6 +41,8 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/grupos', require('./routes/grupos'));
 app.use('/api/opina', require('./routes/opina'));
 app.use('/api/docentes', require('./routes/docentes'));
+app.use('/api/titulos', require('./routes/titulos'));
+app.use('/api/asignaturas', require('./routes/asignaturas'));
 
 // ---------- API protegida: todo lo que sigue requiere sesión ----------
 app.use('/api', requireAuth);
