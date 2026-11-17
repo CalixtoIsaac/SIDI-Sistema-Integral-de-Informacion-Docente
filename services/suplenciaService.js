@@ -117,10 +117,12 @@ function grupoExistente(db, f, suplente, contrato, monto) {
 
 function nuevaIncidencia(db, f, suplente, contrato, monto) {
   const orden = db.prepare('SELECT COALESCE(MAX(orden), 0) + 1 AS n FROM incidencias').get().n;
+  // Si la falta ya está en una quincena, el pago empieza en la fecha de pago de esa quincena (col. N)
+  const aPartirDe = f.quincena_id ? db.prepare('SELECT fecha_pago FROM quincenas WHERE id = ?').get(f.quincena_id)?.fecha_pago ?? null : null;
   return Number(db.prepare(`INSERT INTO incidencias (quincena_id, docente_id, num_contrato, tipo_contrato, cc_nomina, motivo, detalle,
-                              ceco, importe_total, num_periodos, origen, orden)
-                            VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, 1, 'suplencia', ?)`)
-    .run(f.quincena_id, suplente.id, contrato, suplente.tipo_contrato ?? 'determinado', CC_NOMINA, MOTIVO, f.cuenta_cargo, monto, orden)
+                              ceco, importe_total, num_periodos, a_partir_de, origen, orden)
+                            VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, 1, ?, 'suplencia', ?)`)
+    .run(f.quincena_id, suplente.id, contrato, suplente.tipo_contrato ?? 'determinado', CC_NOMINA, MOTIVO, f.cuenta_cargo, monto, aPartirDe, orden)
     .lastInsertRowid);
 }
 
