@@ -13,5 +13,5 @@ Thumbs.db
 # CV de docentes (datos reales del cliente, nunca a git)
 data/cv/
 
-# Datos de demostración (scripts/demo.js): se generan, no se suben
+# Datos de demo (scripts/demo.js): se generan, no se suben
 data/demo/

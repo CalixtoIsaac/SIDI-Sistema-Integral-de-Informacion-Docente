@@ -2,8 +2,8 @@
  * Datos de demostración ANONIMIZADOS (cierre del Sprint 2, D10).
  *
  * Crea una base APARTE (data/demo.db) con docentes, grupos, horarios, contratos, OPINA,
- * bajas, faltas e incidencias inventados, para probar de punta a punta: consulta y filtros,
- * faltas, docentes disponibles, suplencias y los reportes de Nacional. Nunca toca data/app.db.
+ * bajas, faltas, suplencias e incidencias inventados, para probar de punta a punta: consulta y
+ * filtros, faltas, docentes disponibles, suplencias y los reportes de Nacional. Nunca toca data/app.db.
  *
  *   node scripts/demo.js               crea data/demo.db y los Excel ficticios en data/demo/
  *   node scripts/demo.js --reiniciar   borra data/demo.db y la vuelve a crear
@@ -230,6 +230,8 @@ function poblar(db, archivos = generarArchivos()) {
   const contratosService = require('../services/contratosService');
   const bajaService = require('../services/bajaService');
   const faltasService = require('../services/faltasService');
+  const disponiblesService = require('../services/disponiblesService');
+  const suplenciaService = require('../services/suplenciaService');
 
   const importar = (servicio, archivo, extra = {}) =>
     servicio.confirm(db, { previewId: servicio.preview(db, { buffer: archivo.buffer, nombre: archivo.nombre }).previewId, ...extra });
@@ -277,15 +279,37 @@ function poblar(db, archivos = generarArchivos()) {
     faltas.push(...faltasService.crear(db, { docenteId: idDe(db, n), fechas: [dia[letra]], motivo: 'Falta por asunto personal', ...extra }).faltas);
   };
   registrar(1, 'L', { observaciones: 'Trámite personal (demo).' });
+  registrar(1, 'J', { observaciones: 'Trámite personal (demo).' }); // mismo CRN dos días → suplencia agrupada
   registrar(11, 'L', {}); // English II: 5 h en inglés → otra tarifa ($106)
   registrar(5, 'J', { justificacion: 'incapacidad_imss', folioImss: 'DEMO0001' });
   registrar(12, 'V', { justificacion: 'cita_imss', folioImss: 'DEMO0002' });
   registrar(4, 'X', {});
 
-  // 5) Un pago adicional manual pendiente (hoja Incidencia)
+  // 5) Suplencias con los servicios reales (HU-22 disponibles + HU-10 suplencias): generan sus incidencias
+  const faltasDe = (n) => db.prepare('SELECT id, asignatura_id, fecha FROM faltas WHERE docente_id = ? ORDER BY fecha, id').all(idDe(db, n));
+  const libresPara = (n, f) => disponiblesService
+    .disponibles(db, { docenteId: idDe(db, n), fechas: [f.fecha], asignaturaIds: [f.asignatura_id] })
+    .gruposASuplir.flatMap((g) => g.disponibles.filter((x) => !x.empalme && x.recontratable !== 0).map((x) => x.docenteId));
+  const suplir = (f, docenteSuplenteId) => suplenciaService.asignar(db, f.id, { docenteSuplenteId });
+  // a) El mismo suplente cubre el mismo CRN lunes y jueves → una sola incidencia de 2 días (agrupación)
+  const delTitular = faltasDe(1);
+  const crnDosDias = delTitular.find((f) => delTitular.filter((x) => x.asignatura_id === f.asignatura_id).length === 2);
+  if (crnDosDias) {
+    const dias = delTitular.filter((x) => x.asignatura_id === crnDosDias.asignatura_id);
+    const comunes = libresPara(1, dias[0]).filter((id) => libresPara(1, dias[1]).includes(id));
+    if (comunes.length) dias.forEach((f) => suplir(f, comunes[0]));
+  }
+  // b) Falta IMSS: al titular no se le descuenta, pero el suplente sí cobra la tarifa del día
+  const imss = faltasDe(5)[0];
+  if (imss) {
+    const libres = libresPara(5, imss);
+    if (libres.length) suplir(imss, libres[0]);
+  }
+
+  // 6) Un pago adicional manual pendiente (hoja Incidencia); CeCo de la cuenta académica del catálogo
   db.prepare(`INSERT INTO incidencias (docente_id, num_contrato, cc_nomina, motivo, detalle, ceco, importe_total, origen)
               VALUES (?, '5600091', 'Sueldo Carga Académica', 'BB_Tutoreo (Preparatoria).',
-                      'Tutoreo de grupo 611, noviembre 2026 (demo).', '1234567890', 1500, 'manual')`).run(idDe(db, 8));
+                      'Tutoreo de grupo 611, noviembre 2026 (demo).', '5420103000', 1500, 'manual')`).run(idDe(db, 8));
 
   return {
     docentes: DOCENTES.length,
@@ -293,6 +317,7 @@ function poblar(db, archivos = generarArchivos()) {
     respuestasOpina: db.prepare('SELECT COUNT(*) FROM opina_respuestas').pluck().get(),
     bajas: db.prepare('SELECT COUNT(*) FROM docente_bajas').pluck().get(),
     faltas: faltas.length,
+    suplencias: db.prepare('SELECT COUNT(*) FROM suplencias').pluck().get(),
     sinContrato: archivos.contratos.sinContrato,
   };
 }
@@ -328,7 +353,7 @@ function main() {
   }
   db.close();
   console.log(`Demo lista en ${path.relative(RAIZ, destino)}:`);
-  console.log(`  ${r.docentes} docentes, ${r.gruposActual} grupos en AGO-DIC 2026, ${r.respuestasOpina} respuestas OPINA, ${r.bajas} bajas, ${r.faltas} faltas pendientes.`);
+  console.log(`  ${r.docentes} docentes, ${r.gruposActual} grupos en AGO-DIC 2026, ${r.respuestasOpina} respuestas OPINA, ${r.bajas} bajas, ${r.faltas} faltas pendientes, ${r.suplencias} suplencias.`);
   console.log(`  CRN sin contrato (para el aviso): ${r.sinContrato.join(', ')}`);
   console.log(`  Excel ficticios para importar en vivo: ${path.relative(RAIZ, DEMO_DIR)}/`);
   console.log('Abrir la app con la demo (PowerShell):  $env:DB_PATH="data/demo.db"; npm start');
