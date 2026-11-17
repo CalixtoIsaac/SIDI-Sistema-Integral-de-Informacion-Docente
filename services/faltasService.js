@@ -10,7 +10,8 @@
  * Modo 'tarifa': { docenteId, fechas[], asignaturaIds[] (si se omite se proponen los CRN que el
  *   docente tiene ese día), motivo, horasTexto, cuentaCargo, justificacion, folioImss, observaciones,
  *   ticket, montos: { asignaturaId: monto }, contratos: { asignaturaId: '5500001' },
- *   segundasSesiones: [{ asignaturaId, fecha }], confirmarSegundaSesion }
+ *   segundasSesiones: [{ asignaturaId, fecha }], confirmarSegundaSesion,
+ *   suplencias: [{ asignaturaId, fecha, sesion?, docenteSuplenteId, numContrato? }] }   (HU-10)
  * Modo 'manual': { docenteId, modo: 'manual', asignaturaId?, fechaTexto, dias, horasTexto, monto, comentario?, motivo, … }
  *
  * La falta queda PENDIENTE de reportar (quincena_id NULL) hasta que se genera la quincena.
@@ -20,6 +21,7 @@ const { Validador, trae } = require('../lib/validar');
 const { partesFecha, aIso } = require('../lib/quincena');
 const { nombreCompleto } = require('../lib/nombres');
 const d = require('./descuentoService');
+const suplenciaService = require('./suplenciaService');
 
 // ------------------------------------------------------------------ validación común
 
@@ -275,13 +277,21 @@ function insertarFila(db, plan, f) {
 function crear(db, body = {}) {
   const plan = planificar(db, body);
   exigirListo(plan, body);
+  const avisos = [];
   const ids = db.transaction(() => {
     const guardarContrato = db.prepare('UPDATE asignaturas SET num_contrato = ? WHERE id = ?');
     for (const f of plan.filas) if (f.contratoNuevo && f.contrato) guardarContrato.run(f.contrato, f.asignatura.id);
-    return plan.filas.map((f) => insertarFila(db, plan, f));
+    const creadas = plan.filas.map((f) => ({ f, id: insertarFila(db, plan, f) }));
+    for (const [i, s] of (Array.isArray(body.suplencias) ? body.suplencias : []).entries()) {
+      const destino = creadas.find((c) => c.f.asignatura?.id === Number(s.asignaturaId)
+        && (plan.modo === 'manual' || c.f.fecha === s.fecha) && c.f.sesion === Number(s.sesion ?? 1));
+      if (!destino) throw new HttpError(400, 'Una suplencia no corresponde a ninguna de las faltas.', 'SUPLENCIA_SIN_FALTA', [{ indice: i, asignaturaId: s.asignaturaId, fecha: s.fecha }]);
+      avisos.push(...suplenciaService.asignar(db, destino.id, s).avisos.map((a) => ({ faltaId: destino.id, aviso: a })));
+    }
+    return creadas.map((c) => c.id);
   })();
   const faltas = ids.map((id) => obtener(db, id));
-  return { faltas, totales: totales(faltas) };
+  return { faltas, totales: totales(faltas), avisos };
 }
 
 // ------------------------------------------------------------------ consultar
@@ -290,14 +300,15 @@ const SELECT_FALTA = `
   SELECT f.*, dc.nomina, dc.nombres, dc.apellido_paterno, dc.apellido_materno,
          a.crn, a.nombre_actividad, a.materia, a.numero_grupo, a.num_contrato, a.periodo_id,
          q.anio AS q_anio, q.numero AS q_numero, q.cerrada AS q_cerrada,
-         s.id AS suplencia_id, s.docente_suplente_id, s.monto AS suplencia_monto, s.incidencia_id,
+         s.id AS suplencia_id, s.docente_suplente_id, s.monto AS suplencia_monto, s.incidencia_id, inc.num_contrato AS suplencia_contrato,
          ds.nombres AS s_nombres, ds.apellido_paterno AS s_paterno, ds.apellido_materno AS s_materno
   FROM faltas f
   JOIN docentes dc ON dc.id = f.docente_id
   LEFT JOIN asignaturas a ON a.id = f.asignatura_id
   LEFT JOIN quincenas q ON q.id = f.quincena_id
   LEFT JOIN suplencias s ON s.falta_id = f.id
-  LEFT JOIN docentes ds ON ds.id = s.docente_suplente_id`;
+  LEFT JOIN docentes ds ON ds.id = s.docente_suplente_id
+  LEFT JOIN incidencias inc ON inc.id = s.incidencia_id`;
 
 function aRespuesta(r) {
   return {
@@ -325,7 +336,7 @@ function aRespuesta(r) {
     quincena: r.quincena_id ? { id: r.quincena_id, anio: r.q_anio, numero: r.q_numero, etiqueta: `Q${r.q_numero}`, cerrada: r.q_cerrada === 1 } : null,
     pendiente: r.quincena_id === null,
     suplencia: r.suplencia_id
-      ? { id: r.suplencia_id, docenteSuplenteId: r.docente_suplente_id, monto: r.suplencia_monto, incidenciaId: r.incidencia_id,
+      ? { id: r.suplencia_id, docenteSuplenteId: r.docente_suplente_id, monto: r.suplencia_monto, incidenciaId: r.incidencia_id, numContrato: r.suplencia_contrato,
         suplente: nombreCompleto({ nombres: r.s_nombres, apellidoPaterno: r.s_paterno, apellidoMaterno: r.s_materno }) }
       : null,
     creadoEn: r.creado_en,
@@ -425,14 +436,34 @@ function actualizar(db, id, body = {}) {
   const r = recalcular(db, actual, c, body);
   const { monto: _m, ...columnas } = c;
   const todo = { ...columnas, ...r };
-  db.prepare(`UPDATE faltas SET ${Object.keys(todo).map((k) => `${k} = @${k}`).join(', ')} WHERE id = @id`).run({ ...todo, id: actual.id });
+  db.transaction(() => {
+    db.prepare(`UPDATE faltas SET ${Object.keys(todo).map((k) => `${k} = @${k}`).join(', ')} WHERE id = @id`).run({ ...todo, id: actual.id });
+    suplenciaService.sincronizarFalta(db, actual.id); // el suplente cobra lo nuevo (HU-10)
+  })();
   return obtener(db, actual.id);
 }
 
-/** DELETE /faltas/:id (su suplencia se borra en cascada). */
+/** DELETE /faltas/:id: borra la falta, su suplencia y ajusta o borra la incidencia del suplente. */
 function eliminar(db, id) {
   const actual = filaBd(db, id);
-  db.prepare('DELETE FROM faltas WHERE id = ?').run(actual.id);
+  db.transaction(() => {
+    suplenciaService.quitar(db, actual.id);
+    db.prepare('DELETE FROM faltas WHERE id = ?').run(actual.id);
+  })();
 }
 
-module.exports = { preview, crear, listar, obtener, actualizar, eliminar, periodoDeFecha };
+/** PUT /faltas/:id/suplencia → { suplencia, avisos } (423 si la quincena está cerrada). */
+function asignarSuplencia(db, id, body = {}) {
+  const actual = filaBd(db, id);
+  return suplenciaService.asignar(db, actual.id, body);
+}
+
+/** DELETE /faltas/:id/suplencia */
+function quitarSuplencia(db, id) {
+  const actual = filaBd(db, id);
+  if (!db.transaction(() => suplenciaService.quitar(db, actual.id))()) {
+    throw new HttpError(404, 'Esa falta no tiene suplencia.', 'SIN_SUPLENCIA');
+  }
+}
+
+module.exports = { preview, crear, listar, obtener, actualizar, eliminar, asignarSuplencia, quitarSuplencia, periodoDeFecha };

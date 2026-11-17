@@ -7,6 +7,9 @@
  *  GET    /api/faltas/:id       → { falta }
  *  PUT    /api/faltas/:id       → { falta }  recalcula monto y textos · 423 si la quincena está cerrada
  *  DELETE /api/faltas/:id       → 204 · 423 si la quincena está cerrada
+ *  PUT    /api/faltas/:id/suplencia → { suplencia, avisos } { docenteSuplenteId, numContrato?, monto? } (HU-10)
+ *                                     422 si el contrato no es del suplente
+ *  DELETE /api/faltas/:id/suplencia → 204 (HU-10)
  */
 const express = require('express');
 const db = require('../lib/db');
@@ -29,6 +32,12 @@ router.get('/:id', (req, res) => res.json({ falta: faltasService.obtener(db, req
 router.put('/:id', (req, res) => res.json({ falta: faltasService.actualizar(db, req.faltaId, req.body ?? {}) }));
 router.delete('/:id', (req, res) => {
   faltasService.eliminar(db, req.faltaId);
+  res.status(204).end();
+});
+
+router.put('/:id/suplencia', (req, res) => res.json(faltasService.asignarSuplencia(db, req.faltaId, req.body ?? {})));
+router.delete('/:id/suplencia', (req, res) => {
+  faltasService.quitarSuplencia(db, req.faltaId);
   res.status(204).end();
 });
 

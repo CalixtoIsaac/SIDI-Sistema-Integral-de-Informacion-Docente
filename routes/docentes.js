@@ -6,6 +6,7 @@
  *                                   filtros y orden de HU-06 (ver services/filtrosDocentes.js)
  *  GET /api/docentes/:id          → { docente }  ficha extendida (HU-04)
  *  GET /api/docentes/:id/resumen  → { resumen }  hover (HU-04)
+ *  GET /api/docentes/:id/contratos?periodoId= → { contratos } para elegir el contrato del suplente (HU-10)
  *  GET /api/docentes/:id/cv       → PDF del CV · 404 si no tiene (HU-04)
  *  GET /api/docentes/motivos-baja → { motivos: [{ motivo, recontratableSugerido }] } (HU-21)
  *  PATCH /api/docentes/:id/estatus → dar de baja { activo:false, motivo, observaciones, recontratable }
@@ -27,6 +28,7 @@ const edicionService = require('../services/docentesEdicionService');
 const titulosService = require('../services/titulosService');
 const asignaturasService = require('../services/asignaturasService');
 const cvService = require('../services/cvService');
+const suplenciaService = require('../services/suplenciaService');
 const filtros = require('../services/filtrosDocentes');
 const { variosArchivos } = require('../lib/subida');
 const { HttpError, manejarErrores } = require('../lib/errores');
@@ -82,6 +84,10 @@ router.post('/:id/asignaturas', (req, res) => {
 
 router.get('/:id', (req, res) => {
   res.json({ docente: docentesService.detalle(db, req.docenteId, { periodoId: req.query.periodoId }) });
+});
+
+router.get('/:id/contratos', (req, res) => {
+  res.json({ contratos: suplenciaService.contratos(db, req.docenteId, req.query.periodoId) });
 });
 
 router.get('/:id/resumen', (req, res) => {
