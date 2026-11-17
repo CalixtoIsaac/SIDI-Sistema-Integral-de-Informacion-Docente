@@ -3,6 +3,7 @@
  *
  *   validarDescuentos(db, quincenaId)          → lo que se incluirá y avisos (no cambia nada)
  *   generarDescuentos(db, quincenaId, excluir) → asigna los pendientes a la quincena y arma el Excel
+ *   validarIncidencias / generarIncidencias    → hoja Incidencia (pagos manuales + suplencias) y hoja detalle (HU-13)
  *
  * Quincena de reporte (07 §0.1): al generar Qnn se le asignan las faltas PENDIENTES (quincena_id NULL)
  * con fecha ≤ fin de la quincena (y las manuales sin fecha), salvo las que se excluyan para la siguiente.
@@ -13,6 +14,7 @@ const { HttpError } = require('../lib/errores');
 const nominaLib = require('../lib/nomina');
 const { nombreCompleto } = require('../lib/nombres');
 const generadorDescuentos = require('../lib/excel/generadores/descuentos');
+const generadorIncidencias = require('../lib/excel/generadores/incidencias');
 const suplenciaService = require('./suplenciaService');
 const quincenasService = require('./quincenasService');
 
@@ -114,4 +116,112 @@ async function generarDescuentos(db, quincenaId, excluir) {
   return { nombre: `DESCUENTO-PREPA Q${q.numero}.xlsx`, buffer, filas, asignadas };
 }
 
-module.exports = { validarDescuentos, generarDescuentos, asignarPendientes, faltasDeQuincena, listaIds };
+// ------------------------------------------------------------------ Incidencias (HU-13)
+
+const SELECT_INCIDENCIAS = `
+  SELECT i.*, d.nomina, d.nombres, d.apellido_paterno, d.apellido_materno
+  FROM incidencias i JOIN docentes d ON d.id = i.docente_id`;
+
+/**
+ * Incidencias que entrarían: las de la quincena + (si está abierta) las manuales pendientes y las de
+ * suplencias de faltas pendientes con fecha ≤ fin de la quincena.
+ */
+function incidenciasDeQuincena(db, q, excluir = []) {
+  const fuera = new Set(excluir);
+  return db.prepare(`${SELECT_INCIDENCIAS}
+    WHERE i.quincena_id = @id
+       OR (@abierta = 1 AND i.quincena_id IS NULL AND i.origen = 'manual')
+       OR (@abierta = 1 AND i.quincena_id IS NULL AND i.origen = 'suplencia' AND EXISTS (
+            SELECT 1 FROM suplencias s JOIN faltas f ON f.id = s.falta_id
+            WHERE s.incidencia_id = i.id AND f.quincena_id IS NULL AND (f.fecha IS NULL OR f.fecha <= @fin)))
+    ORDER BY i.orden, i.id`).all({ id: q.id, abierta: q.cerrada ? 0 : 1, fin: q.fechaFin })
+    .filter((i) => i.quincena_id === q.id || i.origen === 'suplencia' || !fuera.has(i.id));
+}
+
+function filaIncidencia(i) {
+  return {
+    id: i.id,
+    nominaNacional: nominaLib.aNacional(i.nomina),
+    numContrato: i.num_contrato,
+    nombre: nombre(i),
+    tipoContrato: i.tipo_contrato,
+    ccNomina: i.cc_nomina,
+    motivo: i.motivo,
+    detalle: i.detalle,
+    ceco: i.ceco,
+    elementoPep: i.elemento_pep,
+    ordenInterna: i.orden_interna,
+    importeTotal: i.importe_total,
+    numPeriodos: i.num_periodos,
+    aPartirDe: i.a_partir_de,
+    origen: i.origen,
+  };
+}
+
+function avisosIncidencia(i) {
+  const avisos = [];
+  if (!i.num_contrato) avisos.push(i.origen === 'suplencia' ? 'SUPLENTE_SIN_CONTRATO' : 'SIN_CONTRATO');
+  if (i.elemento_pep && i.elemento_pep.length > 24) avisos.push('PEP_MAYOR_A_24');
+  if (i.orden_interna && i.orden_interna.length > 12) avisos.push('ORDEN_INTERNA_MAYOR_A_12');
+  if (!/^\d{10}$/.test(String(i.ceco ?? ''))) avisos.push('CECO_INVALIDO');
+  if (!(i.importe_total > 0)) avisos.push('IMPORTE_CERO');
+  return avisos;
+}
+
+/** Hoja detalle: una fila por docente que faltó en la quincena (aunque no se le haya descontado). */
+function detalleDeQuincena(db, qId) {
+  const faltas = db.prepare(`SELECT f.docente_id, f.monto_descuento, f.justificacion, f.situacion, f.estatus, s.incidencia_id,
+                                    d.nomina, d.nombres, d.apellido_paterno, d.apellido_materno
+                             FROM faltas f JOIN docentes d ON d.id = f.docente_id
+                             LEFT JOIN suplencias s ON s.falta_id = f.id
+                             WHERE f.quincena_id = ? ORDER BY d.apellido_paterno, d.apellido_materno, d.nombres, f.id`).all(qId);
+  const porDocente = new Map();
+  for (const f of faltas) {
+    if (!porDocente.has(f.docente_id)) {
+      porDocente.set(f.docente_id, { nominaNacional: nominaLib.aNacional(f.nomina), nombre: nombre(f), descontado: 0, incidenciaIds: new Set(), textos: null });
+    }
+    const d = porDocente.get(f.docente_id);
+    if (f.justificacion === 'ninguna') d.descontado += f.monto_descuento;
+    if (f.incidencia_id) d.incidenciaIds.add(f.incidencia_id);
+    // Situación y estatus: los de una falta descontada si la hay; si no, los de la justificación (IMSS)
+    if (!d.textos || (f.justificacion === 'ninguna' && d.textos.justificacion !== 'ninguna')) {
+      d.textos = { justificacion: f.justificacion, situacion: f.situacion, estatus: f.estatus };
+    }
+  }
+  return [...porDocente.values()].map((d) => ({
+    nominaNacional: d.nominaNacional, nombre: d.nombre, descontado: Math.round(d.descontado * 100) / 100,
+    incidenciaIds: [...d.incidenciaIds], situacion: d.textos.situacion, estatus: d.textos.estatus,
+  }));
+}
+
+/** GET /reportes/incidencias/validar?quincenaId= */
+function validarIncidencias(db, quincenaId) {
+  const q = quincena(db, quincenaId);
+  const incidencias = incidenciasDeQuincena(db, q).map((i) => ({ ...filaIncidencia(i), pendiente: i.quincena_id === null, avisos: avisosIncidencia(i) }));
+  return {
+    quincena: q,
+    incidencias,
+    totales: { filas: incidencias.length, importe: Math.round(incidencias.reduce((s, i) => s + i.importeTotal, 0) * 100) / 100 },
+    avisos: incidencias.flatMap((i) => i.avisos.map((tipo) => ({ incidenciaId: i.id, tipo }))),
+  };
+}
+
+/** GET /reportes/incidencias?quincenaId=&excluir=&excluirIncidencias= → { nombre, buffer, incidencias, detalle } */
+async function generarIncidencias(db, quincenaId, excluir, excluirIncidencias) {
+  const q = quincena(db, quincenaId);
+  db.transaction(() => {
+    asignarPendientes(db, q, listaIds(excluir)); // faltas pendientes y sus suplencias
+    if (q.cerrada) return;
+    const asignar = db.prepare('UPDATE incidencias SET quincena_id = ?, a_partir_de = COALESCE(a_partir_de, ?) WHERE id = ?');
+    for (const i of incidenciasDeQuincena(db, q, listaIds(excluirIncidencias))) if (i.quincena_id === null) asignar.run(q.id, q.fechaPago, i.id);
+  })();
+  const incidencias = db.prepare(`${SELECT_INCIDENCIAS} WHERE i.quincena_id = ? ORDER BY i.orden, i.id`).all(q.id).map(filaIncidencia);
+  const detalle = detalleDeQuincena(db, q.id);
+  const buffer = await generadorIncidencias.generar(incidencias, detalle);
+  return { nombre: `INCIDENCIAS PREPA Q${q.numero}.xlsx`, buffer, incidencias, detalle };
+}
+
+module.exports = {
+  validarDescuentos, generarDescuentos, validarIncidencias, generarIncidencias,
+  asignarPendientes, faltasDeQuincena, detalleDeQuincena, listaIds,
+};
