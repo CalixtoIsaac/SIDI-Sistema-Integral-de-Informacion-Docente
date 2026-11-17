@@ -101,3 +101,29 @@ test('perfil variado para filtros y Panel: género, niveles, estudiando, sin CUR
   assert.equal(n('SELECT COUNT(*) FROM docentes WHERE curp IS NULL'), 1, 'un docente incompleto');
   assert.ok(n('SELECT COUNT(*) FROM docentes WHERE primer_semestre_texto IS NOT NULL') >= 2, 'antigüedad capturada a mano');
 });
+
+test('suplencias: agrupada (mismo suplente y CRN, 2 días), IMSS pagada al suplente e incidencias generadas', () => {
+  const { db, resumen } = baseDemo();
+  assert.equal(resumen.suplencias, 3);
+  const inc = db.prepare(`SELECT i.id, i.importe_total, i.ceco, COUNT(s.id) AS dias
+                          FROM incidencias i JOIN suplencias s ON s.incidencia_id = i.id
+                          WHERE i.origen = 'suplencia' GROUP BY i.id ORDER BY dias DESC`).all();
+  assert.equal(inc.length, 2, 'la de 2 días se agrupa en una sola incidencia');
+  assert.equal(inc[0].dias, 2);
+  assert.ok(inc.every((i) => /^\d{10}$/.test(i.ceco)));
+  const imss = db.prepare(`SELECT f.monto_descuento, s.monto FROM suplencias s JOIN faltas f ON f.id = s.falta_id
+                           WHERE f.justificacion <> 'ninguna'`).get();
+  assert.equal(imss.monto_descuento, 0);
+  assert.ok(imss.monto > 0, 'el suplente cobra aunque al titular no se le descuente');
+  // Ningún suplente tenía clase a esa hora (se eligieron de "disponibles")
+  const sinEmpalme = db.prepare(`SELECT COUNT(*) FROM suplencias s WHERE s.docente_suplente_id IN (
+                                  SELECT docente_id FROM faltas WHERE id = s.falta_id)`).pluck().get();
+  assert.equal(sinEmpalme, 0, 'el suplente no es el titular');
+});
+
+test('el pago manual de tutoreo usa un CeCo del catálogo (cuenta académica)', () => {
+  const { db } = baseDemo();
+  const ceco = db.prepare("SELECT ceco FROM incidencias WHERE origen = 'manual'").pluck().get();
+  assert.equal(ceco, '5420103000');
+  assert.equal(db.prepare("SELECT COUNT(*) FROM catalogos WHERE tipo = 'cuenta_cargo' AND valor = ?").pluck().get(ceco), 1);
+});
