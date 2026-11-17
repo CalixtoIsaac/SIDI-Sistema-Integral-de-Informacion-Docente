@@ -115,8 +115,9 @@ function grupoExistente(db, f, suplente, contrato, monto) {
   })?.id ?? null;
 }
 
-function nuevaIncidencia(db, f, suplente, contrato, monto) {
-  const orden = db.prepare('SELECT COALESCE(MAX(orden), 0) + 1 AS n FROM incidencias').get().n;
+function nuevaIncidencia(db, f, suplente, contrato, monto, ordenPrevio = null) {
+  // Conserva el lugar de la fila en el Excel si la suplencia ya tenía incidencia (al reagrupar)
+  const orden = ordenPrevio ?? db.prepare('SELECT COALESCE(MAX(orden), 0) + 1 AS n FROM incidencias').get().n;
   // Si la falta ya está en una quincena, el pago empieza en la fecha de pago de esa quincena (col. N)
   const aPartirDe = f.quincena_id ? db.prepare('SELECT fecha_pago FROM quincenas WHERE id = ?').get(f.quincena_id)?.fecha_pago ?? null : null;
   return Number(db.prepare(`INSERT INTO incidencias (quincena_id, docente_id, num_contrato, tipo_contrato, cc_nomina, motivo, detalle,
@@ -146,8 +147,10 @@ function asignar(db, faltaId, datos = {}) {
     const { suplente, contrato, avisos } = validarSuplente(db, f, datos.docenteSuplenteId, datos.numContrato);
     const monto = datos.monto === undefined || datos.monto === null ? montoDe(f) : Number(datos.monto);
     if (!Number.isFinite(monto) || monto < 0) throw new HttpError(400, 'Monto inválido.', 'VALIDACION', [{ campo: 'monto', problema: 'VALOR_INVALIDO' }]);
+    const previa = db.prepare('SELECT i.orden FROM suplencias s JOIN incidencias i ON i.id = s.incidencia_id WHERE s.falta_id = ?').get(faltaId);
     quitar(db, faltaId);
-    const incidenciaId = grupoExistente(db, f, suplente, contrato, d.redondear(monto)) ?? nuevaIncidencia(db, f, suplente, contrato, monto);
+    const incidenciaId = grupoExistente(db, f, suplente, contrato, d.redondear(monto))
+      ?? nuevaIncidencia(db, f, suplente, contrato, monto, previa?.orden ?? null);
     db.prepare('INSERT INTO suplencias (falta_id, docente_suplente_id, incidencia_id, monto) VALUES (?, ?, ?, ?)')
       .run(faltaId, suplente.id, incidenciaId, d.redondear(monto));
     recalcularIncidencia(db, incidenciaId);
