@@ -32,6 +32,16 @@ const CATALOGOS = [
   ['motivo_baja', 'No cumplió expectativas', '0', 3], ['motivo_baja', 'Problemas de conducta o disciplina', '0', 4],
   ['motivo_baja', 'Otro', null, 5],
   ['campo_formacion', 'Ingeniería y Tecnología', null, 1], ['campo_formacion', 'Educación', null, 2],
+  ['cuenta_cargo', '5420103000', 'académico', 1], ['cuenta_cargo', '5422101001', 'VSPP', 2],
+  ['motivo_falta', 'Falta por asunto personal', null, 1], ['motivo_falta', 'Falta injustificadas', null, 2],
+  ['motivo_falta', 'Suspensión', null, 3],
+  ['horas_falta', '8 horas= 1 día completo', null, 1], ['horas_falta', '4 horas= 1/2 día', null, 2],
+  ['situacion', 'Se hace descuento correspondiente por permiso personal sin justificación.', 'ninguna', 1],
+  ['situacion', 'No se hace descuento correspondiente por incapacidad del IMSS', 'incapacidad_imss', 2],
+  ['situacion', 'No se hace descuento correspondiente por cita médica IMSS', 'cita_imss', 3],
+  ['estatus_falta', 'Se descuenta y se toma la falta correspondiente.', 'ninguna', 1],
+  ['estatus_falta', 'No se descuenta y no se toma la falta correspondiente.', 'incapacidad_imss', 2],
+  ['estatus_falta', 'No se descuenta y no se toma la falta/permiso con goce correspondiente.', 'cita_imss', 3],
 ];
 
 function crearBd() {
