@@ -8,6 +8,7 @@
  *  HU-21  Modal de baja (motivo, observaciones, recontratable sugerido) e insignia "Recontratable".
  *  HU-06  Filtros combinables con chips (incluye Recontratable) y orden.
  *  HU-07  Búsqueda por nombre, CURP, nómina (con o sin L0) o CRN mientras se escribe.
+ *  HU-19  Pestaña "Asignaturas y horarios": departamento, tabla de CRN y vista semanal del horario.
  *
  * Toda la búsqueda, filtros y orden los resuelve GET /api/docentes (services/filtrosDocentes.js).
  */
@@ -413,6 +414,12 @@ const Docentes = (() => {
       a.avisos.includes('SIN_TARIFA') ? '<span class="badge badge-warning badge-plain">Sin tarifa</span>' : ''
     ].join(' ');
     return `
+      <dl class="datos" style="margin-bottom:14px">
+        ${dato('Departamento', UI.guion(d.departamento))}
+        ${dato('Tipo de contrato', UI.guion(d.tipoContrato))}
+        ${dato('Grupos y actividades', String(d.asignaturas.length))}
+        ${dato('Horas por semana', String(d.asignaturas.reduce((s, a) => s + (Number(a.horasSemana) || 0), 0)))}
+      </dl>
       <div class="table-wrap"><table class="table table-compact">
         <thead><tr><th>CRN / actividad</th><th>Materia</th><th>Grupo</th><th>Modalidad</th><th>Horario</th><th class="num">h/sem</th>
           <th>Idioma</th><th>Tipo de clase</th><th class="num">Tarifa (diaria)</th><th class="num">Tarifa (mensual)</th><th>Contrato</th></tr></thead>
@@ -424,7 +431,63 @@ const Docentes = (() => {
             <td class="nowrap">${a.numContrato ? UI.escape(a.numContrato) : ''} ${avisos(a)}</td></tr>`).join('')}</tbody>
         <tfoot><tr><td colspan="9" class="num">Total mensual</td><td class="num">${UI.dinero(d.totalMensual)}</td><td></td></tr></tfoot>
       </table></div>
-      <p class="small muted mt">La tarifa mensual es el pago al semestre entre 4. La vista semanal de horarios llega con HU-19.</p>`;
+      <p class="small muted mt">La tarifa mensual es el pago al semestre entre 4.</p>
+      <p class="section-title mt">Vista semanal</p>
+      ${vistaSemanal(d.asignaturas)}`;
+  }
+
+  // ------------------------------------------------------------------ vista semanal (HU-19)
+  const DIAS_LARGOS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  const aMin = (hhmm) => { const [h, m] = String(hhmm).split(':').map(Number); return h * 60 + (m || 0); };
+
+  /** Reparte en carriles los bloques que se empalman el mismo día (para dibujarlos lado a lado). */
+  function carriles(bloques) {
+    const ordenados = bloques.slice().sort((x, y) => x.ini - y.ini || y.fin - x.fin);
+    let grupo = [];
+    let finGrupo = -1;
+    const cerrarGrupo = () => { const n = Math.max(...grupo.map((b) => b.carril)) + 1; grupo.forEach((b) => { b.carriles = n; }); grupo = []; };
+    for (const b of ordenados) {
+      if (grupo.length && b.ini >= finGrupo) cerrarGrupo();
+      const ocupados = new Set(grupo.filter((g) => g.fin > b.ini).map((g) => g.carril));
+      let c = 0;
+      while (ocupados.has(c)) c += 1;
+      b.carril = c;
+      grupo.push(b);
+      finGrupo = Math.max(finGrupo, b.fin);
+    }
+    if (grupo.length) cerrarGrupo();
+    return ordenados;
+  }
+
+  function vistaSemanal(asignaturas) {
+    const bloques = [];
+    asignaturas.forEach((a, i) => (a.horarios || []).forEach((h) => bloques.push({ a, i, dia: h.dia, inicio: h.inicio, termina: h.fin, ini: aMin(h.inicio), fin: aMin(h.fin) })));
+    if (!bloques.length) return '<p class="muted">Sin horario capturado (llega con el Excel de grupos o se captura en Editar → Asignaturas).</p>';
+    const dias = [1, 2, 3, 4, 5, ...[6, 7].filter((d) => bloques.some((b) => b.dia === d))];
+    const desde = Math.floor(Math.min(...bloques.map((b) => b.ini)) / 60);
+    const hasta = Math.ceil(Math.max(...bloques.map((b) => b.fin)) / 60);
+    const horas = Array.from({ length: hasta - desde }, (_, k) => desde + k);
+    const minutos = (hasta - desde) * 60;
+    const pct = (m) => `${((m - desde * 60) / minutos) * 100}%`;
+    const columna = (dia) => carriles(bloques.filter((b) => b.dia === dia)).map((b) => {
+      const etiqueta = b.a.crn || b.a.nombreActividad || 'Actividad';
+      const titulo = `${etiqueta} · ${b.a.materia || ''}${b.a.numeroGrupo ? ` · grupo ${b.a.numeroGrupo}` : ''} · ${DIAS_LARGOS[b.dia]} ${b.inicio}–${b.termina}`;
+      return `<div class="semana-bloque tono-${b.i % 6}${b.a.crn ? '' : ' actividad'}" title="${UI.escape(titulo)}"
+                  style="top:${pct(b.ini)};height:calc(${((b.fin - b.ini) / minutos) * 100}% - 2px);left:calc(${(b.carril / b.carriles) * 100}% + 2px);width:calc(${100 / b.carriles}% - 4px)">
+                <strong>${UI.escape(etiqueta)}</strong>
+                <span>${UI.escape(b.a.materia || '')}</span>
+                <span class="semana-hora">${UI.escape(b.inicio)}–${UI.escape(b.termina)}${b.a.numeroGrupo ? ` · ${UI.escape(b.a.numeroGrupo)}` : ''}</span>
+              </div>`;
+    }).join('');
+    return `
+      <div class="semana" style="--filas:${horas.length};--dias:${dias.length}" role="img" aria-label="Horario semanal: ${bloques.length} sesiones">
+        <div class="semana-head"><span></span>${dias.map((d) => `<span>${DIAS_LARGOS[d]}</span>`).join('')}</div>
+        <div class="semana-body">
+          <div class="semana-horas">${horas.map((h) => `<span>${String(h).padStart(2, '0')}:00</span>`).join('')}</div>
+          ${dias.map((d) => `<div class="semana-dia">${columna(d)}</div>`).join('')}
+        </div>
+      </div>
+      <p class="small muted mt">${bloques.length} sesión(es) a la semana. Pasa el mouse sobre un bloque para ver el detalle.</p>`;
   }
 
   function tabFaltas(d) {
