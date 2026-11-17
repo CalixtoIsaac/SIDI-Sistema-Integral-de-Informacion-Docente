@@ -148,6 +148,22 @@ test('semillas: son idempotentes y no pisan lo que la coordinadora editó', () =
   assert.equal(db.prepare("SELECT valor FROM configuracion WHERE clave='tema.color'").pluck().get(), '#BE185D');
 });
 
+test('semillas HU-24: % OPP oficial de 3 semestres (88.3, 85.9 y 87.6) sin pisar lo capturado', () => {
+  const db = baseNueva();
+  const filas = () => db.prepare(`SELECT p.clave, o.alumnos, o.positivas, o.opp FROM opina_campus_semestre o
+                                  JOIN periodos p ON p.id = o.periodo_id ORDER BY p.fecha_inicio`).all();
+  assert.deepEqual(filas(), [
+    { clave: 'ENE-MAY 2025', alumnos: 3837, positivas: 3387, opp: 88.3 },
+    { clave: 'AGO-DIC 2025', alumnos: 3590, positivas: 3085, opp: 85.9 },
+    { clave: 'ENE-MAY 2026', alumnos: 3804, positivas: 3333, opp: 87.6 },
+  ]);
+  // La coordinadora corrige un semestre: al volver a sembrar (cada arranque) no se pisa ni se duplica
+  db.prepare("UPDATE opina_campus_semestre SET positivas = 3100 WHERE periodo_id = (SELECT id FROM periodos WHERE clave = 'AGO-DIC 2025')").run();
+  sembrar(db);
+  assert.equal(filas().length, 3);
+  assert.equal(filas()[1].positivas, 3100);
+});
+
 // ------------------------------------------------------------- restricciones
 function docente(db, nomina = 'L03560330', extra = {}) {
   const d = { nombres: 'Ana', apellido_paterno: 'Pérez', ...extra };
@@ -399,6 +415,7 @@ test('envios_correo: modo y resultado válidos', () => {
 
 test('opina_campus_semestre: % OPP calculado, un registro por periodo y positivas ≤ alumnos', () => {
   const db = baseNueva();
+  db.prepare('DELETE FROM opina_campus_semestre').run(); // sin las semillas de HU-24
   const p = (clave) => db.prepare('SELECT id FROM periodos WHERE clave = ?').pluck().get(clave);
   const ins = db.prepare('INSERT INTO opina_campus_semestre (periodo_id, alumnos, positivas) VALUES (?, ?, ?)');
   ins.run(p('ENE-MAY 2026'), 3804, 3333);
