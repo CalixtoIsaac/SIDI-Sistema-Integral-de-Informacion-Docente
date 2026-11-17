@@ -1,6 +1,6 @@
 /**
  * Pruebas de la base de datos: migraciones, semillas, restricciones y vistas
- * del esquema de context/04_Modelo_Datos.md §4 (001_inicial.sql).
+ * del esquema de context/04_Modelo_Datos.md §4 (todas las migraciones de lib/migraciones/).
  * Se ejecutan con:  node --test      (busca solo los *.test.js de tests/)
  *
  * Todo corre sobre bases EN MEMORIA: nunca toca data/app.db.
@@ -44,7 +44,8 @@ function falla(fn) {
 test('las migraciones se aplican en orden y solo una vez', () => {
   const db = new Database(':memory:');
   db.pragma('foreign_keys = ON');
-  const todas = ['001_inicial.sql'];
+  const todas = fs.readdirSync(MIGRACIONES_DIR).filter((f) => /^\d+.*\.sql$/.test(f)).sort();
+  assert.deepEqual(todas.slice(0, 2), ['001_inicial.sql', '002_indice_horarios.sql']);
   assert.deepEqual(migrar(db), todas);
   assert.deepEqual(migrar(db), [], 'la segunda corrida no debe aplicar nada');
   const registradas = db.prepare('SELECT nombre FROM schema_migrations ORDER BY nombre').pluck().all();
@@ -79,13 +80,25 @@ test('el esquema es el de 04 §4: 21 tablas, 26 llaves foráneas y 5 vistas', ()
   assert.deepEqual(vistas, ['v_docente_estudios', 'v_docente_primer_periodo', 'v_opina_campus', 'v_opina_crn', 'v_opina_docente']);
 });
 
-test('001_inicial.sql tiene el mismo SQL que context/04_Modelo_Datos.md §4', () => {
-  // Se comparan sin comentarios ni espacios: la migración puede tener comentarios más cortos.
+test('las migraciones juntas tienen el mismo SQL que context/04_Modelo_Datos.md §4', () => {
+  // Se comparan sin comentarios ni espacios. El §4 es el modelo completo: 001 + 002 + …
   const soloSql = (txt) => txt.replace(/\r\n/g, '\n').replace(/--.*$/gm, '').replace(/\s+/g, ' ').trim();
   const doc = fs.readFileSync(path.join(__dirname, '..', 'context', '04_Modelo_Datos.md'), 'utf8').replace(/\r\n/g, '\n');
   const ddlDoc = doc.slice(doc.indexOf('## 4. DDL')).match(/```sql\n([\s\S]*?)```/)[1];
-  const migracion = fs.readFileSync(path.join(MIGRACIONES_DIR, '001_inicial.sql'), 'utf8');
-  assert.equal(soloSql(migracion), soloSql(ddlDoc), 'si cambia el modelo, el cambio va en una migración nueva (002…)');
+  const migraciones = fs.readdirSync(MIGRACIONES_DIR).filter((f) => /^\d+.*\.sql$/.test(f)).sort()
+    .map((f) => fs.readFileSync(path.join(MIGRACIONES_DIR, f), 'utf8')).join('\n');
+  assert.equal(soloSql(migraciones), soloSql(ddlDoc),
+    'un cambio al modelo va en una migración nueva (003…) y se agrega al final del §4 de 04');
+});
+
+test('HU-22: el índice por día y hora se usa para buscar quién da clase a cierta hora', () => {
+  const db = baseNueva({ semillas: false });
+  const cols = db.pragma('index_info(idx_horarios_dia_hora)').map((c) => c.name);
+  assert.deepEqual(cols, ['dia_semana', 'hora_inicio']);
+  const plan = db.prepare(`EXPLAIN QUERY PLAN
+    SELECT asignatura_id FROM horarios
+    WHERE dia_semana = 2 AND hora_inicio < '12:30' AND hora_fin > '11:00'`).all().map((p) => p.detail).join(' | ');
+  assert.match(plan, /idx_horarios_dia_hora/, plan);
 });
 
 // ------------------------------------------------------------------- semillas
