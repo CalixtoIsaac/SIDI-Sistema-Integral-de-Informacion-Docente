@@ -31,10 +31,10 @@ const App = (() => {
   const VIEWS = {
     panel: { title: 'Panel', module: () => Panel },
     docentes: { title: 'Docentes', module: () => Docentes },
-    faltas: { title: 'Faltas', module: () => proximamente('Faltas y descuentos', 'Sprint 2', 'HU-09, HU-10, HU-22', 'Registro de faltas por día y CRN, suplencias y docentes disponibles.') },
-    incidencias: { title: 'Incidencias', module: () => proximamente('Incidencias', 'Sprint 2', 'HU-11', 'Pagos adicionales de la quincena.') },
+    faltas: { title: 'Faltas', module: () => Faltas },
+    incidencias: { title: 'Incidencias', module: () => Incidencias },
     opina: { title: 'OPINA', module: () => Opina },
-    reportes: { title: 'Reportes', module: () => proximamente('Reportes de Nacional', 'Sprint 2', 'HU-12, HU-13, HU-14', 'Excel de Descuentos e Incidencias de la quincena e inasistencias por semestre.') },
+    reportes: { title: 'Reportes', module: () => Reportes },
     configuracion: { title: 'Configuración', module: () => Catalogos },
     perfil: { title: 'Perfil', module: () => Perfil }
   };

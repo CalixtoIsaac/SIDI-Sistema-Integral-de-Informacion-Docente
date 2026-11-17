@@ -252,6 +252,131 @@ details.mas ol, details.mas ul { margin: 8px 0 0; padding-left: 20px; font-size:
 .stats-5 { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .stat small { display: block; margin-top: 2px; font-size: 12px; color: var(--muted-foreground); }
 
+/* ---------- Selector de quincena (Faltas, Incidencias, Reportes) ---------- */
+.quincena-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.quincena-label { font-size: 13px; font-weight: 600; }
+.quincena-bar .select { height: 36px; min-width: 250px; }
+.danger-text { color: var(--danger-text); }
+.danger-text .icon, .aviso-inline .icon { width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px; }
+.aviso-inline { color: var(--warning-text); margin-top: 4px; }
+.small-empty { padding: 20px 16px; }
+
+/* Listas de Faltas e Incidencias */
+.lista-table td { white-space: nowrap; }
+.lista-table .col-doc { white-space: normal; min-width: 190px; }
+.lista-table .col-texto { white-space: normal; min-width: 240px; max-width: 360px; }
+.lista-table tr.bloqueada > td { color: var(--muted-foreground); }
+
+/* Formulario de pago (HU-11) */
+.contador { float: right; font-size: 11px; font-weight: 500; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.contador.lleno { color: var(--warning-text); }
+.por-periodo { font-size: 13px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--muted); }
+.mt-xs { margin-top: 6px; }
+.orden-num { display: inline-block; min-width: 18px; color: var(--muted-foreground); }
+
+/* Reportes de Nacional (HU-12, HU-13) */
+.reporte-card { display: flex; flex-direction: column; }
+.reporte-card h3 { display: flex; align-items: center; gap: 8px; font-size: 15px; word-break: break-word; }
+.reporte-card h3 .icon { color: var(--primary-text); flex-shrink: 0; }
+.reporte-cifras { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.reporte-cifras div { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--background); }
+.reporte-cifras strong { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+.reporte-cifras span { font-size: 12px; color: var(--muted-foreground); }
+.reporte-card .small .icon { width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px; }
+.revisar-lista { max-height: 280px; border: 1px solid var(--border); }
+.check-input { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+.cierre-box {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px 20px; border: 1px dashed var(--border); border-radius: var(--radius); background: var(--card);
+}
+.cierre-box.cerrada { border-style: solid; background: var(--muted); }
+.cierre-box strong .icon { width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px; }
+
+/* Vista semanal de horarios (HU-19) */
+.semana { --hora: 46px; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--card); min-width: 640px; }
+.semana-head, .semana-body { display: grid; grid-template-columns: 56px repeat(var(--dias), minmax(0, 1fr)); }
+.semana-head span { padding: 8px; font-size: 12px; font-weight: 600; color: var(--muted-foreground); text-align: center; background: var(--muted); border-left: 1px solid var(--border); }
+.semana-head span:first-child { border-left: 0; }
+.semana-body { height: calc(var(--filas) * var(--hora)); }
+.semana-horas { display: grid; grid-template-rows: repeat(var(--filas), 1fr); }
+.semana-horas span { padding: 2px 6px 0 0; font-size: 11px; color: var(--muted-foreground); text-align: right; border-top: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.semana-dia {
+  position: relative; border-left: 1px solid var(--border);
+  background-image: repeating-linear-gradient(to bottom, var(--border) 0 1px, transparent 1px var(--hora));
+}
+.semana-bloque {
+  position: absolute; overflow: hidden; display: flex; flex-direction: column; gap: 1px;
+  padding: 4px 6px; border-radius: 6px; border-left: 3px solid var(--primary);
+  background: var(--primary-soft); color: var(--foreground); font-size: 11px; line-height: 1.25; cursor: default;
+}
+.semana-bloque strong { font-size: 12px; }
+.semana-bloque span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.semana-bloque .semana-hora { color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.semana-bloque.tono-1 { border-left-color: #2563eb; background: color-mix(in srgb, #2563eb 12%, var(--card)); }
+.semana-bloque.tono-2 { border-left-color: #059669; background: color-mix(in srgb, #059669 12%, var(--card)); }
+.semana-bloque.tono-3 { border-left-color: #d97706; background: color-mix(in srgb, #d97706 13%, var(--card)); }
+.semana-bloque.tono-4 { border-left-color: #7c3aed; background: color-mix(in srgb, #7c3aed 12%, var(--card)); }
+.semana-bloque.tono-5 { border-left-color: #0891b2; background: color-mix(in srgb, #0891b2 12%, var(--card)); }
+.semana-bloque.actividad { border-left-style: dashed; }
+.ficha .semana { overflow-x: auto; }
+
+/* ---------- Buscador de docentes ---------- */
+.buscador { position: relative; }
+.buscador .search { width: 100%; }
+.buscador-lista {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 70;
+  max-height: 280px; overflow: auto; margin: 0; padding: 4px; list-style: none;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow-md);
+}
+.buscador-lista li[role="option"] { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.buscador-lista li[role="option"]:hover, .buscador-lista li[aria-selected="true"] { background: var(--muted); }
+.buscador-vacio { padding: 8px 10px; font-size: 13px; color: var(--muted-foreground); }
+
+/* ---------- Modal "Registrar falta" (HU-09, HU-22, HU-10) ---------- */
+.rf { display: flex; flex-direction: column; gap: 18px; }
+.rf-sec { padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.rf-sec:last-of-type { border-bottom: 0; }
+.rf-docente { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.rf-docente .grow { min-width: 260px; }
+.rf-docente-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; }
+.rf-fecha { width: 170px; height: 34px; }
+.rf-fechas { margin: 0; }
+.rf-dia + .rf-dia { margin-top: 14px; }
+.rf-dia-titulo { font-size: 13px; font-weight: 600; margin: 6px 0; }
+.rf-dia-titulo::first-letter { text-transform: uppercase; }
+.rf-crn-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rf-crn-lista + .rf-crn-lista { margin-top: 6px; }
+details.mas .rf-crn-lista { margin-top: 8px; padding-left: 0; }
+.rf-crn {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--card);
+}
+.rf-crn.marcado { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); background: var(--primary-soft); }
+.rf-crn .check { align-items: flex-start; }
+.rf-crn .check input { margin-top: 1px; }
+.rf-crn-extra { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rf-contrato { width: 170px; height: 30px; font-size: 13px; }
+.rf-folio { width: 170px; height: 32px; }
+.rf-suplir { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.rf-suplir-fila {
+  display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr); gap: 12px; align-items: start;
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--background);
+}
+.rf-suplir-grupo { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.suplente-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.suplente-picker .select-wrap:first-child { flex: 1 1 260px; }
+.suplente-picker .select { height: 34px; font-size: 13px; }
+.rf-preview td { white-space: nowrap; }
+.rf-preview .rf-comentario { white-space: normal; min-width: 220px; color: var(--muted-foreground); }
+.rf-monto { display: inline-flex; align-items: center; gap: 4px; }
+.rf-monto .input { width: 96px; text-align: right; }
+.rf-resumen { font-size: 13px; margin: 0; }
+.modal-footer .grow { flex: 1 1 auto; }
+
+@media (max-width: 720px) {
+  .rf-suplir-fila { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ---------- Responsivo ---------- */
 @media (max-width: 900px) {
   .topbar-search { display: none; }
@@ -264,3 +389,5 @@ details.mas ol, details.mas ul { margin: 8px 0 0; padding-left: 20px; font-size:
   .toolbar-actions .btn { flex: 1 1 auto; }
   .ficha { padding: 12px; }
 }
+.modal-xl .modal-footer { position: sticky; bottom: 0; z-index: 3; align-items: center; background: var(--card); border-top: 1px solid var(--border); }
+.revisar-lista td { white-space: nowrap; }
