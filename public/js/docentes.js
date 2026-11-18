@@ -69,8 +69,9 @@ const Docentes = (() => {
       ordenar: 'nombre',
       orden: 'asc',
       columnas: UI.store.get(KEY_COLUMNAS, null) || COLUMNAS.filter((c) => c.defecto).map((c) => c.clave),
-      expandido: null,
-      pestana: 'personales',
+      // #docentes?ficha=<id>&pestana=opina abre la ficha al cargar (desde el ranking de OPINA o el Panel)
+      expandido: Number(parametros.ficha) || null,
+      pestana: PESTANAS.some(([k]) => k === parametros.pestana) ? parametros.pestana : 'personales',
       datos: null,
       peticion: 0
     };

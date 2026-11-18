@@ -93,12 +93,12 @@ button.badge:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .docentes-table tr.expandido > td { background: var(--primary-soft); }
 .docentes-table tr.ficha-row > td { padding: 0; background: var(--background); white-space: normal; }
 .nombre-cell { display: flex; align-items: center; gap: 10px; }
-.nombre-cell .nombre-btn {
+.nombre-cell .nombre-btn, .ranking-tabla .nombre-btn {
   padding: 0; border: 0; background: none; text-align: left; font: inherit; font-weight: 600;
   color: var(--foreground); cursor: pointer;
 }
-.nombre-cell .nombre-btn:hover { color: var(--primary-text); text-decoration: underline; }
-.nombre-cell .nombre-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 4px; }
+.nombre-cell .nombre-btn:hover, .ranking-tabla .nombre-btn:hover { color: var(--primary-text); text-decoration: underline; }
+.nombre-cell .nombre-btn:focus-visible, .ranking-tabla .nombre-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: 4px; }
 .nombre-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
 .crn-list { color: var(--muted-foreground); cursor: help; }
 .opina-baja { color: var(--muted-foreground); cursor: help; }
@@ -391,3 +391,71 @@ details.mas .rf-crn-lista { margin-top: 8px; padding-left: 0; }
 }
 .modal-xl .modal-footer { position: sticky; bottom: 0; z-index: 3; align-items: center; background: var(--card); border-top: 1px solid var(--border); }
 .revisar-lista td { white-space: nowrap; }
+
+/* ---------- Gráficas ligeras (HU-15, HU-16) — public/js/graficas.js ---------- */
+.tono-primario { background: var(--primary); }
+.tono-neutro { background: var(--estado-inactivo); }
+.tono-alerta { background: var(--estado-alerta); }
+.tono-ok { background: var(--estado-activo); }
+.tono-suave { background: var(--primary-soft); box-shadow: inset 0 0 0 1px var(--primary); }
+.gbarras { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+.gbar { display: grid; grid-template-columns: minmax(0, var(--etiqueta, 180px)) minmax(40px, 1fr) auto; align-items: center; gap: 10px; font-size: 13px; }
+.gbar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--foreground); }
+a.gbar-label { text-decoration: none; }
+a.gbar-label:hover { color: var(--primary-text); text-decoration: underline; }
+.gbar-track { height: 12px; border-radius: 6px; background: var(--muted); overflow: hidden; }
+.gbar-fill { display: block; height: 100%; border-radius: 6px; transition: width .35s ease; }
+.gbar-valor { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.gbar-valor small { font-weight: 400; color: var(--muted-foreground); }
+.gcols { display: flex; align-items: stretch; justify-content: space-around; gap: 12px; height: 180px; padding-top: 4px; }
+.gcol { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1 1 0; min-width: 0; max-width: 90px; }
+.gcol-valor { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.gcol-track { position: relative; flex: 1 1 auto; width: 100%; max-width: 46px; border-radius: 8px 8px 0 0; background: var(--muted); overflow: hidden; }
+.gcol-fill { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 8px 8px 0 0; transition: height .35s ease; }
+.gcol-label { font-size: 12px; color: var(--muted-foreground); text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gleyenda { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted-foreground); margin-top: 10px; }
+.gleyenda i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.grafica-vacia { padding: 18px 0; text-align: center; }
+.panel-avisos li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0; }
+.panel-avisos li .icon { width: 16px; height: 16px; }
+
+/* Panel (HU-15) */
+.panel-graficas { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 16px; }
+.panel-graficas .card-body { padding-top: 4px; }
+.panel-ancha { grid-column: 1 / -1; }
+.card-header .select-wrap .select { height: 32px; min-width: 150px; font-size: 13px; }
+.card-header-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.cumple-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.cumple-lista li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.cumple-lista li:last-child { border-bottom: 0; }
+.cumple-dia { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--primary-soft); color: var(--primary-text); font-weight: 700; font-variant-numeric: tabular-nums; }
+.cumple-lista .hoy .cumple-dia { background: var(--primary); color: var(--primary-foreground); }
+
+/* Ranking OPINA (HU-16) */
+.ranking-filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 14px; }
+.ranking-filtros .select { height: 34px; min-width: 160px; }
+.ranking-filtros .input-num { width: 64px; height: 30px; padding: 0 6px; text-align: right; }
+.ranking-filtros .seg label { padding: 6px 10px; }
+.promedios { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1px; margin-bottom: 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--border); }
+.promedios > div { padding: 12px 16px; background: var(--card); }
+.promedios dt { font-size: 12px; color: var(--muted-foreground); }
+.promedios dd { margin: 2px 0 0; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.ranking-tabla tr.top td { background: var(--success-bg); }
+.ranking-tabla tr.bottom td { background: var(--danger-bg); }
+.ranking-tabla tr.insuficiente td { color: var(--muted-foreground); }
+.ranking-tabla .pos { width: 52px; font-weight: 700; }
+.ranking-tabla .barra-pct { display: inline-block; width: 90px; height: 8px; margin-right: 8px; border-radius: 4px; background: var(--muted); overflow: hidden; vertical-align: middle; }
+.ranking-tabla .barra-pct span { display: block; height: 100%; background: var(--primary); }
+.var-up { color: var(--success-text); font-weight: 600; }
+.var-down { color: var(--danger-text); font-weight: 600; }
+.marca { font-size: 11px; font-weight: 600; margin-left: 6px; }
+
+/* Inasistencias por semestre (HU-14) */
+.inasistencias-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 20px; }
+@media (max-width: 900px) { .inasistencias-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) {
+  .gbar { grid-template-columns: minmax(90px, 38%) minmax(40px, 1fr) auto; }
+  .panel-graficas { grid-template-columns: minmax(0, 1fr); }
+}
+.ranking-filtros .seg { flex-wrap: wrap; max-width: 100%; }
+@media (max-width: 640px) { .ranking-tabla .barra-pct { display: none; } }
