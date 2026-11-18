@@ -19,6 +19,30 @@ const DEFECTOS = {
   'reportes.agrupar_suplencias': '1',
 };
 
+/** Correo a Nacional (HU-25, 07 §10): mismos valores iniciales que la semilla de Uziel (#62). */
+const CORREO = {
+  'correo.modo': 'borrador',
+  'correo.para': 'garcia.sandra@tecmilenio.mx;ruben.salas@tecmilenio.mx;jjbarradas@tecmilenio.mx',
+  'correo.cc': '',
+  'correo.cco': '',
+  'correo.asunto': 'Reportes PREPA Veracruz {quincena} — Descuentos e Incidencias',
+  'correo.cuerpo': 'Buen día,\n\nAdjunto los reportes de la quincena {quincena} ({periodo}) de Preparatoria Veracruz:\n'
+    + '- Descuentos: {num_faltas} faltas, total descontado {total_descontado}.\n- Incidencias: {num_pagos} pagos.\n\n'
+    + 'Fecha de pago: {fecha_pago}.\n\nSaludos.',
+  'correo.enviar_al_cerrar': '0',
+};
+Object.assign(DEFECTOS, CORREO);
+
+const CORREO_VALIDO = /^[^\s@;,<>()]+@[^\s@;,<>()]+\.[^\s@;,<>()]+$/;
+
+/** Lista de correos separada por ';' o ','. Devuelve 'a;b' normalizado o el problema. */
+function listaCorreos(v, { obligatorio = false } = {}) {
+  const correos = (Array.isArray(v) ? v : String(v ?? '').split(/[;,]/)).map((x) => String(x).trim()).filter(Boolean);
+  if (!correos.length) return obligatorio ? 'OBLIGATORIO' : '';
+  if (correos.some((c) => !CORREO_VALIDO.test(c))) return 'FORMATO';
+  return [...new Set(correos.map((c) => c.toLowerCase()))].join(';');
+}
+
 const MODOS = ['claro', 'oscuro', 'automatico'];
 
 /** Validador por clave: devuelve el valor normalizado (texto) o lanza el problema. */
@@ -39,6 +63,17 @@ const VALIDAR = {
   'opina.solo_presencial': (v) => (['0', '1', 0, 1, true, false].includes(v) ? (v === true || String(v) === '1' ? '1' : '0') : 'VALOR_INVALIDO'),
   'reportes.agrupar_suplencias': (v) => (['0', '1', 0, 1, true, false].includes(v) ? (v === true || String(v) === '1' ? '1' : '0') : 'VALOR_INVALIDO'),
   'grupos.omitir_grupos': (v) => String(v ?? '').split(',').map((g) => g.trim().toUpperCase()).filter(Boolean).join(','),
+  'correo.modo': (v) => (['borrador', 'mailto'].includes(v) ? v : 'VALOR_INVALIDO'),
+  'correo.para': (v) => listaCorreos(v, { obligatorio: true }),
+  'correo.cc': (v) => listaCorreos(v),
+  'correo.cco': (v) => listaCorreos(v),
+  'correo.asunto': (v) => {
+    const t = String(v ?? '').replace(/\s+/g, ' ').trim();
+    if (!t) return 'OBLIGATORIO';
+    return t.length > 200 ? 'MUY_LARGO' : t;
+  },
+  'correo.cuerpo': (v) => (String(v ?? '').length > 5000 ? 'MUY_LARGO' : String(v ?? '').replace(/\r\n/g, '\n')),
+  'correo.enviar_al_cerrar': (v) => (['0', '1', 0, 1, true, false].includes(v) ? (v === true || String(v) === '1' ? '1' : '0') : 'VALOR_INVALIDO'),
 };
 
 function listar(db) {
@@ -71,4 +106,4 @@ function actualizar(db, body = {}) {
   return listar(db);
 }
 
-module.exports = { listar, actualizar, MODOS };
+module.exports = { listar, actualizar, listaCorreos, MODOS, CORREO };
