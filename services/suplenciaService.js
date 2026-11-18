@@ -83,7 +83,11 @@ function recalcularIncidencia(db, incidenciaId) {
   }
   const faltas = filas.map((x) => falta(db, x.falta_id));
   const primera = faltas[0];
-  const tarifa = filas[0].monto;
+  const importe = d.redondear(filas.reduce((s, x) => s + x.monto, 0));
+  const dias = faltas.reduce((s, f) => s + (f.dias ?? 1), 0);
+  // Pago por día = importe ÷ días: en una falta manual (14 días por $3,183.74) el monto es del periodo,
+  // no de un día; con tarifa normal da lo mismo que el monto de cada suplencia.
+  const tarifa = d.redondear(importe / dias);
   const detalle = texto.generar({
     titular: nombre(primera),
     nomina: primera.nomina,
@@ -93,10 +97,10 @@ function recalcularIncidencia(db, incidenciaId) {
     fechas: faltas.map((f) => f.fecha).filter(Boolean),
     fechaTexto: primera.fecha_texto,
     tarifa,
-    dias: faltas.reduce((s, f) => s + (f.dias ?? 1), 0),
+    dias,
+    total: importe,
     notas: notas(faltas),
   });
-  const importe = d.redondear(filas.reduce((s, x) => s + x.monto, 0));
   db.prepare('UPDATE incidencias SET detalle = ?, importe_total = ?, ceco = ? WHERE id = ?').run(detalle, importe, primera.cuenta_cargo, incidenciaId);
 }
 

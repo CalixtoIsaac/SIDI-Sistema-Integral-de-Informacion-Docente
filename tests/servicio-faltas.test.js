@@ -146,3 +146,14 @@ test('listar con filtros y eliminar', () => {
   faltas.eliminar(db, r.faltas[1].id);
   assert.throws(() => faltas.obtener(db, r.faltas[1].id), { status: 404 });
 });
+
+test('monto editado por día: la clave "asignaturaId|fecha" (o con sesión) gana sobre la del CRN', () => {
+  const { db, ids } = crearEscenario();
+  const a = db.prepare("SELECT id FROM asignaturas WHERE crn = '16001'").get().id;
+  const cuerpo = { ...BASE, docenteId: ids.maria, fechas: ['2026-08-17', '2026-08-20'], asignaturaIds: [a] };
+  assert.deepEqual(faltas.preview(db, cuerpo).filas.map((f) => f.clave), [`${a}|2026-08-17|1`, `${a}|2026-08-20|1`]);
+  const r = faltas.crear(db, { ...cuerpo, montos: { [a]: 50, [`${a}|2026-08-20|1`]: 27 } });
+  assert.deepEqual(r.faltas.map((f) => [f.fecha, f.montoDescuento, f.montoEditado]), [['2026-08-17', 50, true], ['2026-08-20', 27, true]]);
+  const soloUnDia = faltas.preview(db, { ...cuerpo, fechas: ['2026-08-24', '2026-08-27'], montos: { [`${a}|2026-08-27`]: 30 } });
+  assert.deepEqual(soloUnDia.filas.map((f) => [f.montoDescuento, f.montoEditado]), [[54, false], [30, true]]);
+});

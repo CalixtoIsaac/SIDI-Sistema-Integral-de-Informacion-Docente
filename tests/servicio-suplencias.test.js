@@ -110,3 +110,20 @@ test('una suplencia que no corresponde a ninguna falta deshace todo el registro'
   }), { status: 400, code: 'SUPLENCIA_SIN_FALTA' });
   assert.equal(db.prepare('SELECT COUNT(*) n FROM faltas').get().n, 0);
 });
+
+test('suplencia de un descuento manual: el texto usa el pago por día del periodo y el total real', () => {
+  const { db, ids, a16001 } = escenario();
+  const { faltas: [f] } = faltas.crear(db, { ...BASE, docenteId: ids.maria, modo: 'manual', asignaturaId: a16001,
+    fechaTexto: '03/08/2026 al 16/08/2026', dias: 14, horasTexto: '6 horas= 14 días', monto: 3183.74 });
+  faltas.asignarSuplencia(db, f.id, { docenteSuplenteId: ids.guillermo });
+  const [i] = incidencias(db);
+  assert.equal(i.importe_total, 3183.74);
+  assert.match(i.detalle, /del 03\/08\/2026 al 16\/08\/2026, a pagar 14 días\. 14 días\* 227\.41 = 3183\.74$/);
+});
+
+test('suplencias de tarifa normal: el texto no cambia (n días × tarifa = total)', () => {
+  const { db, ids, a16001 } = escenario();
+  faltas.crear(db, { ...BASE, docenteId: ids.maria, fechas: ['2026-08-17', '2026-08-20'], asignaturaIds: [a16001],
+    suplencias: ['2026-08-17', '2026-08-20'].map((fecha) => ({ asignaturaId: a16001, fecha, docenteSuplenteId: ids.guillermo })) });
+  assert.match(incidencias(db)[0].detalle, /a pagar 2 días\. 2 días\* 54\.00 = 108\.00$/);
+});
