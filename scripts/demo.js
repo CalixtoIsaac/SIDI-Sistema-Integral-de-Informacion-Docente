@@ -1,9 +1,14 @@
 /**
- * Datos de demostración ANONIMIZADOS (cierre del Sprint 2, D10).
+ * Datos de demostración ANONIMIZADOS (cierre del Sprint 2, D10; ampliados en D15).
  *
  * Crea una base APARTE (data/demo.db) con docentes, grupos, horarios, contratos, OPINA,
  * bajas, faltas, suplencias e incidencias inventados, para probar de punta a punta: consulta y
- * filtros, faltas, docentes disponibles, suplencias y los reportes de Nacional. Nunca toca data/app.db.
+ * filtros, faltas, docentes disponibles, suplencias, los reportes de Nacional y el resumen
+ * ejecutivo (HU-26). Nunca toca data/app.db.
+ *
+ * Semestres: AGO-DIC 2025 y ENE-MAY 2026 con grupos y OPINA (G2–G4 comparan), AGO-DIC 2026 actual.
+ * Quincenas Q19 y Q20 (octubre) ya reportadas y cerradas, con suplencias (G10); las faltas de
+ * noviembre quedan pendientes. Bajas en ENE-MAY y en el semestre actual (G15).
  *
  *   node scripts/demo.js               crea data/demo.db y los Excel ficticios en data/demo/
  *   node scripts/demo.js --reiniciar   borra data/demo.db y la vuelve a crear
@@ -69,11 +74,28 @@ const DOCENTES = [
   { n: 20, ap: 'Valdez', am: 'Zamora', nom: 'Emilio', sexo: 'H', nac: '1994-11-11', campo: 'Deporte', tit: [['Licenciatura']], ago: ['FUT'], ene: ['FUT'] },
 ];
 
+// AGO-DIC 2025 (semestre anterior): los que ya daban clase repiten sus materias de ENE-MAY;
+// 6, 13 y 20 entraron en ENE-MAY 2026 (nuevos de ese semestre).
+const NUEVOS_ENE = [6, 13, 20];
+for (const d of DOCENTES) if (d.ene && !NUEVOS_ENE.includes(d.n)) d.ant = d.ene;
+
 /** Respuestas OPINA ENE-MAY 2026 por docente: [respuestas, % de "Sí"]. Menos de 10 = muestra insuficiente. */
 const OPINA = {
   1: [24, 96], 2: [18, 89], 3: [22, 91], 4: [16, 75], 5: [20, 95], 6: [12, 100], 7: [15, 80],
   8: [21, 86], 10: [17, 82], 11: [25, 92], 12: [19, 68], 13: [6, 100], 14: [14, 79], 16: [13, 85],
   17: [11, 73], 18: [10, 50], 20: [9, 89],
+};
+
+/** OPINA AGO-DIC 2025 (G4 compara con ENE-MAY 2026: unos suben y otros bajan). */
+const OPINA_ANT = {
+  1: [20, 90], 2: [16, 94], 3: [19, 84], 4: [15, 87], 5: [18, 94], 7: [14, 71], 8: [20, 90],
+  10: [16, 75], 11: [22, 95], 12: [17, 76], 14: [12, 67], 16: [11, 82], 17: [12, 83], 18: [10, 60],
+};
+
+/** Bajas del semestre actual (G15): una recontratable y una no. */
+const BAJAS_ACTUAL = {
+  20: { motivo: 'Renuncia', observaciones: 'Se mudó de ciudad (demo).', recontratable: true },
+  13: { motivo: 'No cumplió expectativas', observaciones: 'Incumplió el reglamento interno (demo).', recontratable: false },
 };
 
 // --------------------------------------------------------------- utilidades
@@ -161,10 +183,13 @@ const ENC_OPINA_V2 = [
   '¿Deseas compartir algún comentario adicional sobre tu profesor?',
 ];
 
-/** Respuestas OPINA (v2) repartidas entre los grupos del docente; el % de "Sí" sale de OPINA. */
-function filasOpina(gruposEne) {
+/**
+ * Respuestas OPINA (v2) repartidas entre los grupos del docente; el % de "Sí" sale de la tabla.
+ * `descartes` agrega 2 filas que el importador omite (en línea y otro campus).
+ */
+function filasOpina(gruposEne, tabla = OPINA, etiqueta = '2026 Ene - May', descartes = true) {
   const filas = [];
-  for (const [n, [total, pct]] of Object.entries(OPINA)) {
+  for (const [n, [total, pct]] of Object.entries(tabla)) {
     const d = DOCENTES.find((x) => x.n === Number(n));
     const suyos = gruposEne.filter((g) => g.docente === d.n);
     if (!suyos.length) continue;
@@ -173,11 +198,12 @@ function filasOpina(gruposEne) {
       const g = suyos[i % suyos.length];
       const rec = i < si ? 'Sí' : 'No';
       const plan = g.modalidad === 'Bachillerato Intercultural' ? 'Bachillerato General Bilingüe' : 'Bachillerato General';
-      filas.push(['2026 Ene - May', plan, g.crn, `Veracruz_${g.clave}_${g.grupo}`, g.nombre, nombreExcel(d), nomina(d.n),
+      filas.push([etiqueta, plan, g.crn, `Veracruz_${g.clave}_${g.grupo}`, g.nombre, nombreExcel(d), nomina(d.n),
         'Veracruz', 'Presencial', rec, 'Sí', i % 3 ? 'Sí' : 'No estoy seguro', 'Sí', rec === 'Sí' ? 'Sí' : 'No', rec,
         rec === 'No' && i % 2 ? 'Comentario de ejemplo' : null]);
     }
   }
+  if (!descartes) return filas;
   // Filas que el importador descarta (en línea y otro campus) para mostrar los descartes
   const g = gruposEne[0];
   filas.push(['2026 Ene - May', 'Bachillerato General', g.crn, 'x', g.nombre, 'Demo  Otro campus', 'L09999998', 'Monterrey', 'Presencial', 'Sí', 'Sí', 'Sí', 'Sí', 'Sí', 'Sí', null]);
@@ -193,6 +219,7 @@ function libro(hojas) {
 
 /** Los Excel ficticios de entrada (también se guardan en data/demo/ para importarlos en vivo). */
 function generarArchivos() {
+  const ant = armarGrupos('2025 Ago - Dic', 'ant', 14000, 590);
   const ene = armarGrupos('2026 Ene - May', 'ene', 15000, 600);
   const ago = armarGrupos('2026 Ago - Dic', 'ago', 16000, 610);
   // Un CRN con DOS sesiones el mismo día (miércoles 13:30 y 15:00), para el caso de la 2ª sesión
@@ -210,6 +237,8 @@ function generarArchivos() {
     .map((g, i) => [g.crn, String(5600000 + i * 7), nomina(g.docente)]);
 
   return {
+    gruposAnt: { nombre: 'grupos_AGO-DIC_2025.xlsx', buffer: libro({ Salida: [ENC_GRUPOS, ...ant.filas] }), grupos: ant.grupos },
+    opinaAnt: { nombre: 'opina_AGO-DIC_2025.xlsx', buffer: libro({ H: [ENC_OPINA_V2, ...filasOpina(ant.grupos, OPINA_ANT, '2025 Ago - Dic', false)] }) },
     gruposEne: { nombre: 'grupos_ENE-MAY_2026.xlsx', buffer: libro({ Salida: [ENC_GRUPOS, ...ene.filas] }), grupos: ene.grupos },
     gruposAgo: { nombre: 'grupos_AGO-DIC_2026.xlsx', buffer: libro({ Salida: [ENC_GRUPOS, ...ago.filas] }), grupos: ago.grupos },
     opina: { nombre: 'opina_ENE-MAY_2026.xlsx', buffer: libro({ H: [ENC_OPINA_V2, ...filasOpina(ene.grupos)] }) },
@@ -232,11 +261,15 @@ function poblar(db, archivos = generarArchivos()) {
   const faltasService = require('../services/faltasService');
   const disponiblesService = require('../services/disponiblesService');
   const suplenciaService = require('../services/suplenciaService');
+  const reporteService = require('../services/reporteService');
+  const quincenasService = require('../services/quincenasService');
 
   const importar = (servicio, archivo, extra = {}) =>
     servicio.confirm(db, { previewId: servicio.preview(db, { buffer: archivo.buffer, nombre: archivo.nombre }).previewId, ...extra });
 
-  // 1) Semestre anterior y OPINA, después el semestre actual y sus contratos
+  // 1) Semestres anteriores con su OPINA, después el semestre actual y sus contratos
+  importar(gruposService, archivos.gruposAnt);
+  importar(opinaService, archivos.opinaAnt);
   importar(gruposService, archivos.gruposEne);
   importar(opinaService, archivos.opina);
   importar(gruposService, archivos.gruposAgo);
@@ -269,15 +302,52 @@ function poblar(db, archivos = generarArchivos()) {
     bajaService.registrarBaja(db, idDe(db, d.n), bajas[d.est], ene);
     if (d.est === 'reactivado') bajaService.reactivar(db, idDe(db, d.n), {});
   }
+  // Bajas del semestre actual (G15)
+  for (const [n, baja] of Object.entries(BAJAS_ACTUAL)) bajaService.registrarBaja(db, idDe(db, Number(n)), baja, actual);
 
-  // 4) Faltas pendientes (Q22: 1–15 de noviembre de 2026), con el servicio real de faltas
-  const faltas = [];
+  // 4) Faltas con el servicio real de faltas. Semana de un lunes: { L: fecha, M: …, V: … }
+  const semana = (lunes) => Object.fromEntries([...DIAS].map((l, i) => [l, `${lunes.slice(0, 8)}${String(Number(lunes.slice(8)) + i).padStart(2, '0')}`]));
   const conClaseEl = (n, letra) => archivos.gruposAgo.grupos.some((g) => g.docente === n && g.dias.includes(letra));
-  const dia = { L: '2026-11-09', M: '2026-11-10', X: '2026-11-11', J: '2026-11-12', V: '2026-11-13' };
-  const registrar = (n, letra, extra) => {
-    if (!conClaseEl(n, letra)) return;
-    faltas.push(...faltasService.crear(db, { docenteId: idDe(db, n), fechas: [dia[letra]], motivo: 'Falta por asunto personal', ...extra }).faltas);
+  const crearFaltas = (n, letra, extra, dias) => {
+    if (!conClaseEl(n, letra)) return [];
+    return faltasService.crear(db, { docenteId: idDe(db, n), fechas: [dias[letra]], motivo: 'Falta por asunto personal', ...extra }).faltas;
   };
+  const faltasDe = (n) => db.prepare('SELECT id, asignatura_id, fecha FROM faltas WHERE docente_id = ? ORDER BY fecha, id').all(idDe(db, n));
+  const sinContrato = new Set(archivos.contratos.sinContrato.map((crn) => db.prepare(
+    'SELECT docente_id FROM asignaturas WHERE periodo_id = ? AND crn = ?').pluck().get(actual, crn)));
+  const libresPara = (n, f) => disponiblesService
+    .disponibles(db, { docenteId: idDe(db, n), fechas: [f.fecha], asignaturaIds: [f.asignatura_id] })
+    .gruposASuplir.flatMap((g) => g.disponibles.filter((x) => !x.empalme && x.recontratable !== 0).map((x) => x.docenteId))
+    .filter((id) => !sinContrato.has(id)); // el suplente necesita contrato para la hoja Incidencia
+  const suplir = (f, docenteSuplenteId) => suplenciaService.asignar(db, f.id, { docenteSuplenteId });
+  const suplirPrimera = (n) => {
+    const f = faltasDe(n)[0];
+    const libres = f ? libresPara(n, f) : [];
+    if (libres.length) suplir(f, libres[0]);
+  };
+
+  // 4a) Octubre ya reportado (G10): Q19 y Q20 con faltas, IMSS y suplencias; se asignan con el
+  //     servicio de reportes (igual que al generar los Excel) y se cierran.
+  const reportadas = [];
+  const q19 = semana('2026-10-05');
+  reportadas.push(...crearFaltas(2, 'L', {}, q19), ...crearFaltas(7, 'J', {}, q19),
+    ...crearFaltas(14, 'J', { justificacion: 'incapacidad_imss', folioImss: 'DEMO0003' }, q19));
+  const q20 = semana('2026-10-19');
+  reportadas.push(...crearFaltas(10, 'J', {}, q20), ...crearFaltas(3, 'L', {}, q20),
+    ...crearFaltas(8, 'L', { justificacion: 'cita_imss', folioImss: 'DEMO0004' }, q20));
+  [2, 14, 10, 8].forEach(suplirPrimera);
+  const cerradas = [];
+  for (const numero of [19, 20]) {
+    const id = db.prepare('SELECT id FROM quincenas WHERE anio = 2026 AND numero = ?').pluck().get(numero);
+    reporteService.asignarPendientes(db, quincenasService.obtener(db, id));
+    quincenasService.actualizar(db, id, { cerrada: true });
+    cerradas.push(`Q${numero}`);
+  }
+
+  // 4b) Faltas pendientes de reportar (semana del 9 al 13 de noviembre de 2026)
+  const faltas = [];
+  const nov = semana('2026-11-09');
+  const registrar = (n, letra, extra) => faltas.push(...crearFaltas(n, letra, extra, nov));
   registrar(1, 'L', { observaciones: 'Trámite personal (demo).' });
   registrar(1, 'J', { observaciones: 'Trámite personal (demo).' }); // mismo CRN dos días → suplencia agrupada
   registrar(11, 'L', {}); // English II: 5 h en inglés → otra tarifa ($106)
@@ -285,12 +355,7 @@ function poblar(db, archivos = generarArchivos()) {
   registrar(12, 'V', { justificacion: 'cita_imss', folioImss: 'DEMO0002' });
   registrar(4, 'X', {});
 
-  // 5) Suplencias con los servicios reales (HU-22 disponibles + HU-10 suplencias): generan sus incidencias
-  const faltasDe = (n) => db.prepare('SELECT id, asignatura_id, fecha FROM faltas WHERE docente_id = ? ORDER BY fecha, id').all(idDe(db, n));
-  const libresPara = (n, f) => disponiblesService
-    .disponibles(db, { docenteId: idDe(db, n), fechas: [f.fecha], asignaturaIds: [f.asignatura_id] })
-    .gruposASuplir.flatMap((g) => g.disponibles.filter((x) => !x.empalme && x.recontratable !== 0).map((x) => x.docenteId));
-  const suplir = (f, docenteSuplenteId) => suplenciaService.asignar(db, f.id, { docenteSuplenteId });
+  // 5) Suplencias de noviembre con los servicios reales (HU-22 disponibles + HU-10 suplencias)
   // a) El mismo suplente cubre el mismo CRN lunes y jueves → una sola incidencia de 2 días (agrupación)
   const delTitular = faltasDe(1);
   const crnDosDias = delTitular.find((f) => delTitular.filter((x) => x.asignatura_id === f.asignatura_id).length === 2);
@@ -317,6 +382,8 @@ function poblar(db, archivos = generarArchivos()) {
     respuestasOpina: db.prepare('SELECT COUNT(*) FROM opina_respuestas').pluck().get(),
     bajas: db.prepare('SELECT COUNT(*) FROM docente_bajas').pluck().get(),
     faltas: faltas.length,
+    faltasReportadas: reportadas.length,
+    quincenasCerradas: cerradas,
     suplencias: db.prepare('SELECT COUNT(*) FROM suplencias').pluck().get(),
     sinContrato: archivos.contratos.sinContrato,
   };
@@ -348,12 +415,13 @@ function main() {
   }
 
   fs.mkdirSync(DEMO_DIR, { recursive: true });
-  for (const a of [archivos.gruposEne, archivos.gruposAgo, archivos.opina, archivos.contratos]) {
+  for (const a of [archivos.gruposAnt, archivos.opinaAnt, archivos.gruposEne, archivos.gruposAgo, archivos.opina, archivos.contratos]) {
     fs.writeFileSync(path.join(DEMO_DIR, a.nombre), a.buffer);
   }
   db.close();
   console.log(`Demo lista en ${path.relative(RAIZ, destino)}:`);
-  console.log(`  ${r.docentes} docentes, ${r.gruposActual} grupos en AGO-DIC 2026, ${r.respuestasOpina} respuestas OPINA, ${r.bajas} bajas, ${r.faltas} faltas pendientes, ${r.suplencias} suplencias.`);
+  console.log(`  ${r.docentes} docentes, ${r.gruposActual} grupos en AGO-DIC 2026, ${r.respuestasOpina} respuestas OPINA, ${r.bajas} bajas, ${r.suplencias} suplencias.`);
+  console.log(`  Faltas: ${r.faltasReportadas} reportadas en ${r.quincenasCerradas.join(' y ')} (cerradas) y ${r.faltas} pendientes.`);
   console.log(`  CRN sin contrato (para el aviso): ${r.sinContrato.join(', ')}`);
   console.log(`  Excel ficticios para importar en vivo: ${path.relative(RAIZ, DEMO_DIR)}/`);
   console.log('Abrir la app con la demo (PowerShell):  $env:DB_PATH="data/demo.db"; npm start');
