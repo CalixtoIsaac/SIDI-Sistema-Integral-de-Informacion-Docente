@@ -148,20 +148,28 @@ test('semillas: son idempotentes y no pisan lo que la coordinadora editó', () =
   assert.equal(db.prepare("SELECT valor FROM configuracion WHERE clave='tema.color'").pluck().get(), '#BE185D');
 });
 
-test('semillas HU-24: % OPP oficial de 3 semestres (88.3, 85.9 y 87.6) sin pisar lo capturado', () => {
+test('semillas HU-24: % OPP oficial de 3 semestres (88.3, 85.9 y 87.6) y de la región, sin pisar lo capturado', () => {
   const db = baseNueva();
-  const filas = () => db.prepare(`SELECT p.clave, o.alumnos, o.positivas, o.opp FROM opina_campus_semestre o
+  const filas = () => db.prepare(`SELECT p.clave, o.alumnos, o.positivas, o.opp, o.region_opp FROM opina_campus_semestre o
                                   JOIN periodos p ON p.id = o.periodo_id ORDER BY p.fecha_inicio`).all();
   assert.deepEqual(filas(), [
-    { clave: 'ENE-MAY 2025', alumnos: 3837, positivas: 3387, opp: 88.3 },
-    { clave: 'AGO-DIC 2025', alumnos: 3590, positivas: 3085, opp: 85.9 },
-    { clave: 'ENE-MAY 2026', alumnos: 3804, positivas: 3333, opp: 87.6 },
+    { clave: 'ENE-MAY 2025', alumnos: 3837, positivas: 3387, opp: 88.3, region_opp: 88.5 },
+    { clave: 'AGO-DIC 2025', alumnos: 3590, positivas: 3085, opp: 85.9, region_opp: 86.6 },
+    { clave: 'ENE-MAY 2026', alumnos: 3804, positivas: 3333, opp: 87.6, region_opp: 85.7 },
   ]);
   // La coordinadora corrige un semestre: al volver a sembrar (cada arranque) no se pisa ni se duplica
-  db.prepare("UPDATE opina_campus_semestre SET positivas = 3100 WHERE periodo_id = (SELECT id FROM periodos WHERE clave = 'AGO-DIC 2025')").run();
+  db.prepare("UPDATE opina_campus_semestre SET positivas = 3100, region_opp = 90 WHERE periodo_id = (SELECT id FROM periodos WHERE clave = 'AGO-DIC 2025')").run();
   sembrar(db);
   assert.equal(filas().length, 3);
   assert.equal(filas()[1].positivas, 3100);
+  assert.equal(filas()[1].region_opp, 90, 'el % de la región capturado tampoco se pisa');
+});
+
+test('semillas HU-24: una base que ya tenía los semestres sin la región la recibe al arrancar', () => {
+  const db = baseNueva();
+  db.prepare('UPDATE opina_campus_semestre SET region_opp = NULL').run(); // como quedó con la semilla anterior
+  sembrar(db);
+  assert.deepEqual(db.prepare('SELECT region_opp FROM opina_campus_semestre ORDER BY periodo_id').pluck().all(), [88.5, 86.6, 85.7]);
 });
 
 // ------------------------------------------------------------- restricciones
