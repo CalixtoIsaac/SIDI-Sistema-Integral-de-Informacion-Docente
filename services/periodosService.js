@@ -35,4 +35,17 @@ function actualOUltimo(db) {
     ?? null;
 }
 
-module.exports = { buscar, asegurar, actual, actualOUltimo };
+/** GET /periodos: del más reciente al más antiguo, con lo que tiene cargado cada uno. */
+function listar(db) {
+  return db.prepare(`
+    SELECT p.*,
+      EXISTS (SELECT 1 FROM opina_respuestas r WHERE r.periodo_id = p.id) AS tiene_opina,
+      EXISTS (SELECT 1 FROM asignaturas a WHERE a.periodo_id = p.id)      AS tiene_grupos
+    FROM periodos p
+    ORDER BY p.fecha_inicio DESC, p.id DESC`).all().map((p) => ({
+    id: p.id, clave: p.clave, etiquetaOpina: p.etiqueta_opina, fechaInicio: p.fecha_inicio, fechaFin: p.fecha_fin,
+    actual: p.actual === 1, tieneOpina: p.tiene_opina === 1, tieneGrupos: p.tiene_grupos === 1,
+  }));
+}
+
+module.exports = { buscar, asegurar, actual, actualOUltimo, listar };
