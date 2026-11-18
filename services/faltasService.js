@@ -9,7 +9,8 @@
  *
  * Modo 'tarifa': { docenteId, fechas[], asignaturaIds[] (si se omite se proponen los CRN que el
  *   docente tiene ese día), motivo, horasTexto, cuentaCargo, justificacion, folioImss, observaciones,
- *   ticket, montos: { asignaturaId: monto }, contratos: { asignaturaId: '5500001' },
+ *   ticket, montos: { asignaturaId | 'asignaturaId|fecha' | 'asignaturaId|fecha|sesion': monto }
+ *   (gana la clave más específica; la preview devuelve la clave de cada fila en `clave`), contratos: { asignaturaId: '5500001' },
  *   segundasSesiones: [{ asignaturaId, fecha }], confirmarSegundaSesion,
  *   suplencias: [{ asignaturaId, fecha, sesion?, docenteSuplenteId, numContrato? }] }   (HU-10)
  * Modo 'manual': { docenteId, modo: 'manual', asignaturaId?, fechaTexto, dias, horasTexto, monto, comentario?, motivo, … }
@@ -113,6 +114,17 @@ function validarTarifa(db, body) {
   return { docente, fechas, c, montos, contratos, ids, asignaturas };
 }
 
+/**
+ * Monto editado de una fila: el de la clave más específica que venga en `montos`
+ * ('12|2026-08-17|2' → '12|2026-08-17' → '12'), o null si no se editó.
+ */
+function montoEditadoDe(montos, asignaturaId, fecha, sesion) {
+  for (const clave of [`${asignaturaId}|${fecha}|${sesion}`, `${asignaturaId}|${fecha}`, String(asignaturaId)]) {
+    if (trae(montos, clave)) return d.redondear(montos[clave]);
+  }
+  return null;
+}
+
 /** Arma las filas (asignatura × fecha × sesión) con su monto y sus avisos. */
 function planificarTarifa(db, body) {
   const s = validarTarifa(db, body);
@@ -126,7 +138,7 @@ function planificarTarifa(db, body) {
   }
   const existe = db.prepare('SELECT id FROM faltas WHERE docente_id = ? AND asignatura_id = ? AND fecha = ? AND sesion = ?');
   for (const { a, fecha, sesion } of pares) {
-    const editado = trae(s.montos, String(a.id)) ? d.redondear(s.montos[a.id]) : null;
+    const editado = montoEditadoDe(s.montos, a.id, fecha, sesion);
     const contrato = String(s.contratos[a.id] ?? '').trim() || a.num_contrato;
     const avisos = [];
     const sesiones = d.sesionesEseDia(a, fecha).length;
@@ -190,6 +202,7 @@ function planificar(db, body = {}) {
 function filaPreview(f) {
   const a = f.asignatura;
   return {
+    clave: a && f.fecha ? `${a.id}|${f.fecha}|${f.sesion}` : null, // para editar el monto solo de esta fila
     asignaturaId: a?.id ?? null,
     crn: a?.crn ?? null,
     materia: a ? (a.crn ? a.materia : a.nombre_actividad ?? a.materia) : null,
