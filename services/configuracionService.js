@@ -19,18 +19,8 @@ const DEFECTOS = {
   'reportes.agrupar_suplencias': '1',
 };
 
-/** Correo a Nacional (HU-25, 07 §10): mismos valores iniciales que la semilla de Uziel (#62). */
-const CORREO = {
-  'correo.modo': 'borrador',
-  'correo.para': 'garcia.sandra@tecmilenio.mx;ruben.salas@tecmilenio.mx;jjbarradas@tecmilenio.mx',
-  'correo.cc': '',
-  'correo.cco': '',
-  'correo.asunto': 'Reportes PREPA Veracruz {quincena} — Descuentos e Incidencias',
-  'correo.cuerpo': 'Buen día,\n\nAdjunto los reportes de la quincena {quincena} ({periodo}) de Preparatoria Veracruz:\n'
-    + '- Descuentos: {num_faltas} faltas, total descontado {total_descontado}.\n- Incidencias: {num_pagos} pagos.\n\n'
-    + 'Fecha de pago: {fecha_pago}.\n\nSaludos.',
-  'correo.enviar_al_cerrar': '0',
-};
+/** Correo a Nacional (HU-25, 07 §10): los valores iniciales salen de la semilla (lib/semillas.js), un solo lugar. */
+const CORREO = Object.fromEntries(require('../lib/semillas').CORREO);
 Object.assign(DEFECTOS, CORREO);
 
 const CORREO_VALIDO = /^[^\s@;,<>()]+@[^\s@;,<>()]+\.[^\s@;,<>()]+$/;
