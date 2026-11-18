@@ -164,6 +164,32 @@ test('semillas HU-24: % OPP oficial de 3 semestres (88.3, 85.9 y 87.6) sin pisar
   assert.equal(filas()[1].positivas, 3100);
 });
 
+test('semillas HU-25: claves correo.* del borrador de Outlook, sin pisar lo que se edite', () => {
+  const db = baseNueva();
+  const correo = () => Object.fromEntries(db.prepare("SELECT clave, valor FROM configuracion WHERE clave LIKE 'correo.%'").all()
+    .map((f) => [f.clave, f.valor]));
+  const c = correo();
+  assert.deepEqual(Object.keys(c).sort(), ['correo.asunto', 'correo.cc', 'correo.cco', 'correo.cuerpo',
+    'correo.enviar_al_cerrar', 'correo.modo', 'correo.para']);
+  assert.equal(c['correo.modo'], 'borrador');
+  assert.equal(c['correo.enviar_al_cerrar'], '0');
+  // Los 3 destinatarios de Nacional (07 §10), separados por ';' y con formato válido
+  const para = c['correo.para'].split(';');
+  assert.equal(para.length, 3);
+  assert.ok(para.every((x) => /^[^@\s;]+@[^@\s;]+\.[^@\s;]+$/.test(x)), para.join(' | '));
+  assert.equal(c['correo.cc'], '');
+  // Asunto y cuerpo solo usan las variables documentadas
+  const VARIABLES = ['{quincena}', '{periodo}', '{fecha_pago}', '{total_descontado}', '{num_faltas}', '{num_pagos}'];
+  for (const clave of ['correo.asunto', 'correo.cuerpo']) {
+    for (const v of c[clave].match(/\{[^}]+\}/g) ?? []) assert.ok(VARIABLES.includes(v), `${clave}: ${v}`);
+  }
+  assert.match(c['correo.asunto'], /\{quincena\}/);
+  // La coordinadora cambia destinatarios: al volver a sembrar no se pisa
+  db.prepare("UPDATE configuracion SET valor = 'otra@demo.mx' WHERE clave = 'correo.para'").run();
+  sembrar(db);
+  assert.equal(correo()['correo.para'], 'otra@demo.mx');
+});
+
 // ------------------------------------------------------------- restricciones
 function docente(db, nomina = 'L03560330', extra = {}) {
   const d = { nombres: 'Ana', apellido_paterno: 'Pérez', ...extra };
