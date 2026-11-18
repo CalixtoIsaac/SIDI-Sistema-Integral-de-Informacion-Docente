@@ -7,6 +7,7 @@
  *  - Tarjeta INCIDENCIAS PREPA Qnn.xlsx: pagos que se incluirán (se pueden quitar los manuales pendientes)
  *    y avisos. Las suplencias siguen a su falta: si se quita la falta, su pago también se queda fuera.
  *  - Cerrar / reabrir la quincena (impide cambios en sus faltas e incidencias).
+ *  - Debajo: inasistencias por semestre (HU-14, public/js/inasistencias.js).
  *
  *  Rutas: GET /quincenas · GET /quincenas/actual · PATCH /quincenas/:id
  *         GET /reportes/descuentos/validar · GET /reportes/descuentos (descarga)
@@ -210,7 +211,8 @@ const Reportes = (() => {
       </section>
       <div class="toolbar"><div id="repSelector"></div></div>
       <div class="grid-2" id="repTarjetas"></div>
-      <div class="mt" id="repCierre"></div>`;
+      <div class="mt" id="repCierre"></div>
+      <section class="card reporte-card mt" id="repInasistencias"></section>`;
     selector = Comun.selectorQuincena(el.querySelector('#repSelector'), {
       onChange: () => { excluirFaltas.clear(); excluirIncidencias.clear(); cargar(); }
     });
@@ -229,6 +231,7 @@ const Reportes = (() => {
       if (i) { const id = Number(i.dataset.excluirIncidencia); if (i.checked) excluirIncidencias.delete(id); else excluirIncidencias.add(id); pintar(); }
     });
     selector.recargar().then(cargar);
+    Inasistencias.montar(el.querySelector('#repInasistencias'));
   }
 
   return { mount };
