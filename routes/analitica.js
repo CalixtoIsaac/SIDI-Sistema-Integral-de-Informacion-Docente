@@ -7,10 +7,14 @@
  *  GET /api/analitica/perfil-docentes?activo=       → género, nivel de estudios, campo de formación y antigüedad
  *  GET /api/analitica/faltas-por-motivo?periodoId=  → por motivo y por tipo (Asunto personal / Incapacidad médica)
  *  GET /api/analitica/cumpleanos-mes?mes=           → cumpleaños de docentes activos del mes
+ *  GET /api/analitica/resumen-ejecutivo?periodoId=&compararCon=&graficas=G1,G2,…
+ *                                                    → { portada, kpis, diapositivas, hallazgos } (HU-26)
+ *  GET /api/analitica/plantilla?periodos=1,2,3       → activos, nuevos y bajas por semestre (G15, HU-26)
  */
 const express = require('express');
 const db = require('../lib/db');
 const analitica = require('../services/analiticaService');
+const resumenEjecutivo = require('../services/resumenEjecutivoService');
 const { manejarErrores } = require('../lib/errores');
 
 const router = express.Router();
@@ -21,6 +25,9 @@ router.get('/distribucion-nivel', (req, res) => res.json(analitica.distribucionN
 router.get('/perfil-docentes', (req, res) => res.json(analitica.perfilDocentes(db, req.query)));
 router.get('/faltas-por-motivo', (req, res) => res.json(analitica.faltasPorMotivo(db, req.query)));
 router.get('/cumpleanos-mes', (req, res) => res.json(analitica.cumpleanosMes(db, req.query)));
+
+router.get('/resumen-ejecutivo', (req, res) => res.json(resumenEjecutivo.resumen(db, req.query)));
+router.get('/plantilla', (req, res) => res.json(resumenEjecutivo.plantilla(db, req.query)));
 
 router.use(manejarErrores);
 
