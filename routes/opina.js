@@ -3,6 +3,9 @@
  *
  *  POST   /api/opina/preview             multipart (archivo .xlsx/.xlsb, hasta 30 MB) → NO guarda
  *  POST   /api/opina/confirm             { previewId, reemplazar } → 201 | 409 si ya existe y no se reemplaza
+ *  GET    /api/opina/ranking?periodoId=&filtro=todos|mejores|peores|rango&n=&min=&max=&compararCon=&incluirMuestraInsuficiente=
+ *                                        → ranking completo con promedios (HU-16)
+ *  GET    /api/opina/ranking/excel?…     → descarga OPINA_RANKING_<PERIODO>.xlsx (mismo filtro)
  *  GET    /api/opina/importaciones       → historial
  *  DELETE /api/opina/importaciones/:id   → 204
  *  GET    /api/opina/campus               → % OPP oficial del campus por semestre con variación (HU-24)
@@ -12,6 +15,7 @@
 const express = require('express');
 const db = require('../lib/db');
 const opinaService = require('../services/opinaService');
+const rankingService = require('../services/rankingService');
 const { unArchivo } = require('../lib/subida');
 const opinaCampusService = require('../services/opinaCampusService');
 const { HttpError, manejarErrores } = require('../lib/errores');
@@ -28,6 +32,14 @@ router.post('/confirm', (req, res) => {
     reemplazar: req.body?.reemplazar === true,
   });
   res.status(201).json(resultado);
+});
+
+router.get('/ranking', (req, res) => res.json(rankingService.ranking(db, req.query)));
+router.get('/ranking/excel', (req, res) => {
+  const { nombre, buffer } = rankingService.excel(db, req.query);
+  res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.set('Content-Disposition', `attachment; filename="${nombre}"`);
+  res.send(buffer);
 });
 
 router.get('/importaciones', (req, res) => {
