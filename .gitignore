@@ -9,3 +9,9 @@ data/*.db-wal
 npm-debug.log*
 .DS_Store
 Thumbs.db
+
+# CV de docentes (datos reales del cliente, nunca a git)
+data/cv/
+
+# Datos de demo (scripts/demo.js): se generan, no se suben
+data/demo/
