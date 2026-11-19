@@ -9,6 +9,8 @@
  *     - genera los 2 Excel (asigna los pendientes a la quincena, igual que al descargarlos)
  *     - borrador → .eml con X-Unsent: 1 y los 2 adjuntos · mailto → enlace mailto: + URLs de los 2 archivos
  *     - registra el envío en la bitácora (envios_correo)
+ *   vistaPrevia(db, query) → { para, cc, cco, asunto, cuerpo, modo, archivos, rojos } SIN generar ni asignar nada:
+ *     lo que llevaría el correo con las variables ya sustituidas (para mostrarlo antes de enviar)
  *   envios(db, { quincenaId? }) → { envios: [...] } (más recientes primero)
  *
  * Variables del asunto y del cuerpo: {quincena} {periodo} {fecha_pago} {total_descontado} {num_faltas} {num_pagos}.
@@ -85,6 +87,46 @@ function registrar(db, q, correo, archivos, resultado, error = null) {
     .lastInsertRowid);
 }
 
+/** Variables del asunto y del cuerpo a partir de lo que entraría (respeta lo excluido). */
+function variablesDe(q, filasDescuento, incidencias) {
+  return {
+    quincena: `Q${q.numero}`,
+    periodo: textoPeriodo(q),
+    fecha_pago: ddmmaaaa(q.fechaPago),
+    total_descontado: dinero(filasDescuento.reduce((s, f) => s + f.monto, 0)),
+    num_faltas: filasDescuento.length,
+    num_pagos: incidencias.length,
+  };
+}
+
+/** GET /reportes/enviar/vista-previa?quincenaId=&excluir=&excluirIncidencias=&para=&cc=&cco=&asunto=&cuerpo= */
+function vistaPrevia(db, query = {}) {
+  if (!query.quincenaId) throw new HttpError(400, 'Indica la quincena (quincenaId).', 'VALIDACION', [{ campo: 'quincenaId', problema: 'OBLIGATORIO' }]);
+  const desc = reportes.validarDescuentos(db, query.quincenaId);
+  const inc = reportes.validarIncidencias(db, query.quincenaId);
+  const q = desc.quincena;
+  const fueraFaltas = ids(query.excluir);
+  const fueraInc = ids(query.excluirIncidencias);
+  const filas = desc.filas.filter((f) => f.vaEnDescuentos && !fueraFaltas.has(f.faltaId));
+  const pagos = inc.incidencias.filter((i) => !fueraInc.has(i.id));
+  const cfg = configuracion.listar(db);
+  const campo = (k) => (query[k] !== undefined ? query[k] : cfg[`correo.${k}`]);
+  const variables = variablesDe(q, filas, pagos);
+  return {
+    quincena: q,
+    modo: cfg['correo.modo'],
+    para: eml.lista(campo('para')),
+    cc: eml.lista(campo('cc')),
+    cco: eml.lista(campo('cco')),
+    plantilla: { asunto: campo('asunto'), cuerpo: campo('cuerpo') },
+    asunto: sustituir(campo('asunto'), variables),
+    cuerpo: sustituir(campo('cuerpo'), variables),
+    variables,
+    archivos: [`DESCUENTO-PREPA Q${q.numero}.xlsx`, `INCIDENCIAS PREPA Q${q.numero}.xlsx`],
+    rojos: avisosRojos(db, query.quincenaId, query),
+  };
+}
+
 /** POST /reportes/enviar */
 async function preparar(db, body = {}) {
   if (!body.quincenaId) throw new HttpError(400, 'Indica la quincena (quincenaId).', 'VALIDACION', [{ campo: 'quincenaId', problema: 'OBLIGATORIO' }]);
@@ -97,14 +139,7 @@ async function preparar(db, body = {}) {
   const desc = await reportes.generarDescuentos(db, body.quincenaId, body.excluir);
   const inc = await reportes.generarIncidencias(db, body.quincenaId, body.excluir, body.excluirIncidencias);
   const q = reportes.validarDescuentos(db, body.quincenaId).quincena;
-  const variables = {
-    quincena: `Q${q.numero}`,
-    periodo: textoPeriodo(q),
-    fecha_pago: ddmmaaaa(q.fechaPago),
-    total_descontado: dinero(desc.filas.reduce((s, f) => s + f.monto, 0)),
-    num_faltas: desc.filas.length,
-    num_pagos: inc.incidencias.length,
-  };
+  const variables = variablesDe(q, desc.filas, inc.incidencias);
   const asunto = sustituir(correo.asunto, variables);
   const cuerpo = sustituir(correo.cuerpo, variables);
   const archivos = [desc.nombre, inc.nombre];
@@ -171,4 +206,4 @@ function envios(db, query = {}) {
   };
 }
 
-module.exports = { enviar, envios, avisosRojos, textoPeriodo, sustituir, ROJOS };
+module.exports = { enviar, envios, vistaPrevia, avisosRojos, textoPeriodo, sustituir, ROJOS };
