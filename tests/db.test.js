@@ -165,11 +165,31 @@ test('semillas HU-24: % OPP oficial de 3 semestres (88.3, 85.9 y 87.6) y de la r
   assert.equal(filas()[1].region_opp, 90, 'el % de la región capturado tampoco se pisa');
 });
 
-test('semillas HU-24: una base que ya tenía los semestres sin la región la recibe al arrancar', () => {
+test('semillas HU-24: una base de antes (sin la marca y sin la región) la recibe una sola vez', () => {
   const db = baseNueva();
   db.prepare('UPDATE opina_campus_semestre SET region_opp = NULL').run(); // como quedó con la semilla anterior
+  db.prepare("DELETE FROM configuracion WHERE clave = 'semillas.opp_campus'").run();
   sembrar(db);
   assert.deepEqual(db.prepare('SELECT region_opp FROM opina_campus_semestre ORDER BY periodo_id').pluck().all(), [88.5, 86.6, 85.7]);
+  assert.equal(db.prepare("SELECT valor FROM configuracion WHERE clave = 'semillas.opp_campus'").pluck().get(), '1');
+});
+
+test('semillas HU-24: lo que la coordinadora borra del % OPP no regresa al reiniciar', () => {
+  const db = baseNueva();
+  const periodo = (clave) => db.prepare('SELECT id FROM periodos WHERE clave = ?').pluck().get(clave);
+  db.prepare('DELETE FROM opina_campus_semestre WHERE periodo_id = ?').run(periodo('ENE-MAY 2025'));
+  db.prepare('UPDATE opina_campus_semestre SET region_opp = NULL WHERE periodo_id = ?').run(periodo('AGO-DIC 2025'));
+  sembrar(db); // cada arranque
+  sembrar(db);
+  const filas = db.prepare(`SELECT p.clave, o.region_opp FROM opina_campus_semestre o JOIN periodos p ON p.id = o.periodo_id
+                            ORDER BY p.fecha_inicio`).all();
+  assert.deepEqual(filas, [
+    { clave: 'AGO-DIC 2025', region_opp: null },
+    { clave: 'ENE-MAY 2026', region_opp: 85.7 },
+  ]);
+  db.prepare('DELETE FROM opina_campus_semestre').run(); // borra todo
+  sembrar(db);
+  assert.equal(db.prepare('SELECT COUNT(*) FROM opina_campus_semestre').pluck().get(), 0);
 });
 
 test('semillas HU-25: claves correo.* del borrador de Outlook, sin pisar lo que se edite', () => {
