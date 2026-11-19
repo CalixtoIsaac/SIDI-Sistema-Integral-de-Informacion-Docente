@@ -166,8 +166,16 @@ function asignar(db, faltaId, datos = {}) {
 function sincronizarFalta(db, faltaId) {
   const s = db.prepare('SELECT * FROM suplencias WHERE falta_id = ?').get(faltaId);
   if (!s) return;
-  const contrato = s.incidencia_id ? db.prepare('SELECT num_contrato FROM incidencias WHERE id = ?').get(s.incidencia_id)?.num_contrato : null;
+  let contrato = s.incidencia_id ? db.prepare('SELECT num_contrato FROM incidencias WHERE id = ?').get(s.incidencia_id)?.num_contrato : null;
+  // Si el contrato guardado ya no es del suplente (p. ej. se volvió a importar el Excel de grupos o de
+  // contratos), no se detiene todo: se toma el contrato vigente del suplente (o queda sin contrato con aviso).
+  if (contrato && !contratoVigente(db, s.docente_suplente_id, contrato)) contrato = null;
   asignar(db, faltaId, { docenteSuplenteId: s.docente_suplente_id, numContrato: contrato });
+}
+
+/** ¿El contrato sigue siendo de ese docente (según sus asignaturas)? */
+function contratoVigente(db, docenteId, contrato) {
+  return Boolean(db.prepare('SELECT 1 FROM asignaturas WHERE docente_id = ? AND num_contrato = ? LIMIT 1').get(docenteId, String(contrato)));
 }
 
 function obtener(db, faltaId) {
@@ -193,4 +201,4 @@ function contratos(db, docenteId, periodoId) {
   return contratosDe(db, docenteId, periodoId ? Number(periodoId) : null);
 }
 
-module.exports = { asignar, quitar, sincronizarFalta, obtener, contratos, montoDe, recalcularIncidencia, CC_NOMINA, MOTIVO };
+module.exports = { asignar, quitar, sincronizarFalta, obtener, contratos, montoDe, recalcularIncidencia, contratoVigente, CC_NOMINA, MOTIVO };

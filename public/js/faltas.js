@@ -1017,5 +1017,5 @@ const Faltas = (() => {
     if (parametros.nueva) registrar({ docenteId: Number(parametros.docente) || null }).then((ok) => ok && cargar());
   }
 
-  return { mount, registrar, asignarSuplente };
+  return { mount, registrar, asignarSuplente, editar };
 })();

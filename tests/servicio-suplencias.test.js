@@ -127,3 +127,22 @@ test('suplencias de tarifa normal: el texto no cambia (n días × tarifa = total
     suplencias: ['2026-08-17', '2026-08-20'].map((fecha) => ({ asignaturaId: a16001, fecha, docenteSuplenteId: ids.guillermo })) });
   assert.match(incidencias(db)[0].detalle, /a pagar 2 días\. 2 días\* 54\.00 = 108\.00$/);
 });
+
+test('si el contrato guardado del suplente ya no es suyo, el reporte avisa y al generar usa el vigente (no truena)', async () => {
+  const reportes = require('../services/reporteService');
+  const { db, ids, a16001 } = escenario();
+  faltas.crear(db, {
+    ...BASE, docenteId: ids.maria, fechas: ['2026-08-17'], asignaturaIds: [a16001],
+    suplencias: [{ asignaturaId: a16001, fecha: '2026-08-17', docenteSuplenteId: ids.guillermo }],
+  });
+  // Se volvió a importar el reporte de contratos: el de Guillermo cambió de 5500002 a 5500009
+  db.prepare('UPDATE asignaturas SET num_contrato = ? WHERE docente_id = ?').run('5500009', ids.guillermo);
+  const q = { id: Number(db.prepare("INSERT INTO quincenas (anio, numero, fecha_inicio, fecha_fin, fecha_pago) VALUES (2026, 16, '2026-08-16', '2026-08-31', '2026-08-30')").run().lastInsertRowid) };
+  const v = reportes.validarIncidencias(db, q.id);
+  assert.ok(v.avisos.some((a) => a.tipo === 'CONTRATO_NO_ES_DEL_SUPLENTE'));
+  const d = await reportes.generarDescuentos(db, q.id);
+  assert.equal(d.asignadas, 1);
+  assert.equal(incidencias(db)[0].num_contrato, '5500009');
+  const inc = await reportes.generarIncidencias(db, q.id);
+  assert.equal(inc.incidencias[0].numContrato, '5500009');
+});
