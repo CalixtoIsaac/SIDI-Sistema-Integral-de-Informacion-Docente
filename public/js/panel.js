@@ -9,7 +9,7 @@
  * Datos: GET /api/analitica/* (kpis, opina, distribucion-nivel, perfil-docentes, faltas-por-motivo,
  * cumpleanos-mes) + /periodos para el selector y /docentes para los avisos. Las gráficas son HTML/CSS
  * (graficas.js) y usan el color principal, así que siguen al tema sin redibujar.
- * El resumen ejecutivo (HU-26) llega en el Sprint 3.
+ * El botón "Resumen ejecutivo" abre las diapositivas de HU-26 (public/js/resumen.js, ruta #resumen).
  */
 const Panel = (() => {
   let el = null;
@@ -27,7 +27,7 @@ const Panel = (() => {
           <h2>Panel administrativo</h2>
           <p class="muted" id="panelPeriodo">Resumen de la plantilla docente.</p>
         </div>
-        <button class="btn btn-outline" type="button" disabled title="Llega en el Sprint 3 (HU-26)">${UI.icon('chart')}Resumen ejecutivo</button>
+        <a class="btn btn-outline" href="#resumen">${UI.icon('chart')}Resumen ejecutivo</a>
       </section>
       <div class="stats stats-5" id="panelStats">
         ${stat('Docentes activos', null, 'users', 'tone-success')}
