@@ -122,3 +122,12 @@ test('eml: nombres con acento usan filename*, asunto ASCII sin codificar, CRLF',
   assert.match(b, /filename\*=UTF-8''Resumen%20%C3%B1\.xlsx/);
   assert.equal(b.replace(/\r\n/g, '').includes('\n'), false);
 });
+
+test('los valores por defecto de correo.* salen de un solo lugar (la semilla)', () => {
+  const { CORREO } = require('../lib/semillas');
+  const { crearBd } = require('./helpers/bd');
+  const sinSemilla = crearBd(); // BD sin semillas: Configuración usa los mismos valores por defecto
+  const valores = configuracion.listar(sinSemilla);
+  for (const [clave, valor] of CORREO) assert.equal(valores[clave], valor, clave);
+  assert.equal(configuracion.CORREO['correo.para'], CORREO.find(([c]) => c === 'correo.para')[1]);
+});
