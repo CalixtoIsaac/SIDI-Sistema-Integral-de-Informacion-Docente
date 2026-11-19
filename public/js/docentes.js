@@ -479,11 +479,22 @@ const Docentes = (() => {
         ${dato('Tipo de contrato', UI.guion(d.tipoContrato))}
         ${dato('Antigüedad', d.antiguedad ? UI.escape(d.antiguedad.texto) : '—')}
         ${dato('Primer semestre', UI.guion(d.antiguedad ? d.antiguedad.desde : d.primerSemestreTexto))}
-        ${dato('Cursos (CV)', d.cursos.length ? UI.escape(d.cursos.join(' · ')) : '—')}
         ${dato('Idiomas (CV)', d.idiomas.length ? UI.escape(d.idiomas.join(' · ')) : '—')}
       </dl>
       <p class="section-title">Títulos</p>
-      ${titulos}`;
+      ${titulos}
+      <p class="section-title mt">Cursos y certificados (CV)</p>
+      ${d.cursos.length
+        ? `<ul class="lista-cv">${d.cursos.map((c) => `<li>${UI.escape(c)}</li>`).join('')}</ul>`
+        : '<p class="muted">Sin cursos leídos del CV.</p>'}
+      <p class="section-title mt">Experiencia (CV)</p>
+      ${(d.experiencia || []).length
+        ? `<ul class="lista-cv">${d.experiencia.map((x) => `<li>
+            <strong>${UI.escape(x.cargo || (x.asignaturas && x.asignaturas.length ? 'Docente' : 'Puesto sin nombre'))}</strong>${x.institucion ? ` · ${UI.escape(x.institucion)}` : ''}
+            ${x.periodo ? `<span class="muted"> · ${UI.escape(x.periodo)}</span>` : ''}
+            ${x.vigente ? ' <span class="badge badge-success badge-plain" title="El CV dice “a la fecha”: sigue trabajando ahí">Actual</span>' : ''}
+            ${x.asignaturas && x.asignaturas.length ? `<div class="small muted">${UI.escape(x.asignaturas.join(' · '))}</div>` : ''}</li>`).join('')}</ul>`
+        : '<p class="muted">Sin experiencia leída del CV.</p>'}`;
   }
 
   // ------------------------------------------------------------------ vista semanal (HU-19)
