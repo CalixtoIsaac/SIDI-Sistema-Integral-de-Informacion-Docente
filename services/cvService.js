@@ -166,6 +166,7 @@ function guardarExtras(db, docenteId, propuesta, datos) {
   } catch { /* se reemplaza */ }
   extra.cursos = datos.cursos ?? propuesta.cursos ?? [];
   extra.idiomas = datos.idiomas ?? propuesta.idiomas ?? [];
+  extra.experiencia = datos.experiencia ?? propuesta.experiencia ?? [];
   db.prepare('UPDATE docentes SET datos_adicionales = ? WHERE id = ?').run(JSON.stringify(extra), docenteId);
 }
 

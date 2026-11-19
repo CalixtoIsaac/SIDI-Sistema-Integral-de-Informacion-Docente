@@ -123,6 +123,23 @@ test('eml: nombres con acento usan filename*, asunto ASCII sin codificar, CRLF',
   assert.equal(b.replace(/\r\n/g, '').includes('\n'), false);
 });
 
+test('vista previa del correo: variables sustituidas, adjuntos y avisos rojos, sin asignar ni generar nada', () => {
+  const { db, q16 } = escenario();
+  const v = envio.vistaPrevia(db, { quincenaId: q16 });
+  assert.deepEqual(v.para, ['garcia.sandra@tecmilenio.mx', 'ruben.salas@tecmilenio.mx', 'jjbarradas@tecmilenio.mx']);
+  assert.equal(v.asunto, 'Reportes PREPA Veracruz Q16 — Descuentos e Incidencias');
+  assert.match(v.cuerpo, /quincena Q16 \(16–31 ago 2026\)/);
+  assert.match(v.cuerpo, /3 faltas, total descontado \$214\.00/);
+  assert.deepEqual(v.archivos, ['DESCUENTO-PREPA Q16.xlsx', 'INCIDENCIAS PREPA Q16.xlsx']);
+  assert.deepEqual(v.rojos, []);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM faltas WHERE quincena_id IS NOT NULL').get().n, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM envios_correo').get().n, 0);
+  // Lo editado para este envío y lo excluido cambian la vista previa
+  const e = envio.vistaPrevia(db, { quincenaId: q16, asunto: 'Prueba {quincena}', excluir: String(db.prepare('SELECT id FROM faltas ORDER BY id LIMIT 1').get().id) });
+  assert.equal(e.asunto, 'Prueba Q16');
+  assert.equal(e.variables.num_faltas, 2);
+});
+
 test('los valores por defecto de correo.* salen de un solo lugar (la semilla)', () => {
   const { CORREO } = require('../lib/semillas');
   const { crearBd } = require('./helpers/bd');

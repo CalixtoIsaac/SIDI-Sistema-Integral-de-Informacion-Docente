@@ -80,7 +80,7 @@ function validarDescuentos(db, quincenaId) {
   const q = quincena(db, quincenaId);
   const faltas = faltasDeQuincena(db, q);
   const filas = faltas.map((f) => ({
-    ...filaDescuento(f), crn: f.crn, justificacion: f.justificacion, pendiente: f.quincena_id === null,
+    ...filaDescuento(f), crn: f.crn, asignaturaId: f.asignatura_id, justificacion: f.justificacion, pendiente: f.quincena_id === null,
     vaEnDescuentos: f.justificacion === 'ninguna', avisos: avisosDe(f),
   }));
   const enExcel = filas.filter((f) => f.vaEnDescuentos);
@@ -158,9 +158,11 @@ function filaIncidencia(i) {
   };
 }
 
-function avisosIncidencia(i) {
+function avisosIncidencia(db, i) {
   const avisos = [];
   if (!i.num_contrato) avisos.push(i.origen === 'suplencia' ? 'SUPLENTE_SIN_CONTRATO' : 'SIN_CONTRATO');
+  // El contrato guardado ya no aparece en las asignaturas del suplente: al generar se cambia por el vigente
+  else if (i.origen === 'suplencia' && !suplenciaService.contratoVigente(db, i.docente_id, i.num_contrato)) avisos.push('CONTRATO_NO_ES_DEL_SUPLENTE');
   if (i.elemento_pep && i.elemento_pep.length > 24) avisos.push('PEP_MAYOR_A_24');
   if (i.orden_interna && i.orden_interna.length > 12) avisos.push('ORDEN_INTERNA_MAYOR_A_12');
   if (!/^\d{10}$/.test(String(i.ceco ?? ''))) avisos.push('CECO_INVALIDO');
@@ -197,7 +199,12 @@ function detalleDeQuincena(db, qId) {
 /** GET /reportes/incidencias/validar?quincenaId= */
 function validarIncidencias(db, quincenaId) {
   const q = quincena(db, quincenaId);
-  const incidencias = incidenciasDeQuincena(db, q).map((i) => ({ ...filaIncidencia(i), pendiente: i.quincena_id === null, avisos: avisosIncidencia(i) }));
+  const faltasDe = db.prepare('SELECT falta_id FROM suplencias WHERE incidencia_id = ? ORDER BY falta_id');
+  const incidencias = incidenciasDeQuincena(db, q).map((i) => ({
+    ...filaIncidencia(i), docenteId: i.docente_id, pendiente: i.quincena_id === null, avisos: avisosIncidencia(db, i),
+    // Para el botón "Corregir" de Reportes: las suplencias se corrigen desde su falta
+    faltaIds: i.origen === 'suplencia' ? faltasDe.all(i.id).map((r) => r.falta_id) : [],
+  }));
   return {
     quincena: q,
     incidencias,

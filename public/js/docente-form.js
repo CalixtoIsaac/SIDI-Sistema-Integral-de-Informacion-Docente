@@ -50,15 +50,23 @@ const DocenteForm = (() => {
     if (catalogos) return catalogos;
     const tipos = ['nivel_estudios', 'campo_formacion', 'tipo_contrato'];
     const res = await Promise.all(tipos.map((t) => UI.api(`/catalogos?tipo=${t}`).then((r) => r.catalogos.map((c) => c.valor)).catch(() => [])));
-    catalogos = { grados: res[0], campos: res[1], contratos: res[2].length ? res[2] : ['determinado'] };
+    catalogos = { grados: res[0], campos: res[1], contratos: res[2].length ? res[2] : ['determinado'], departamentos: [] };
     return catalogos;
+  }
+
+  /** Los departamentos se leen cada vez que se abre el formulario (se pueden agregar en Configuración). */
+  async function cargarDepartamentos() {
+    try {
+      const { departamentos } = await UI.api('/departamentos');
+      catalogos.departamentos = departamentos.map((d) => [d.id, d.nombre]);
+    } catch { catalogos.departamentos = []; }
   }
 
   function vacio() {
     return {
       nomina: '', nombres: '', apellidoPaterno: '', apellidoMaterno: '', curp: '', fechaNacimiento: '', genero: '',
       correoInstitucional: '', nivelImparte: '', campoFormacion: '', trabajoExterno: '', primerSemestre: '',
-      tipoContrato: 'determinado', aceptarCurpConAviso: false, titulos: [], asignaturas: []
+      tipoContrato: 'determinado', departamentoId: '', aceptarCurpConAviso: false, titulos: [], asignaturas: []
     };
   }
 
@@ -67,7 +75,7 @@ const DocenteForm = (() => {
       nomina: d.nomina, nombres: d.nombres || '', apellidoPaterno: d.apellidoPaterno || '', apellidoMaterno: d.apellidoMaterno || '',
       curp: d.curp || '', fechaNacimiento: d.fechaNacimiento || '', genero: d.genero || '', correoInstitucional: d.correoInstitucional || '',
       nivelImparte: d.nivelImparte || '', campoFormacion: d.campoFormacion || '', trabajoExterno: d.trabajoExterno || '',
-      primerSemestre: d.primerSemestreTexto || '', tipoContrato: d.tipoContrato || 'determinado', aceptarCurpConAviso: false,
+      primerSemestre: d.primerSemestreTexto || '', tipoContrato: d.tipoContrato || 'determinado', departamentoId: d.departamentoId || '', aceptarCurpConAviso: false,
       titulos: d.titulos.map((t) => ({ id: t.id, grado: t.grado, nombreTitulo: t.nombreTitulo || '', institucion: t.institucion || '',
         periodoTexto: t.periodoTexto || '', estatus: t.estatus, cedula: t.cedula || '' })),
       asignaturas: d.asignaturas.map((a) => ({ id: a.id, tipo: a.crn ? 'crn' : 'actividad', crn: a.crn || '', nombreActividad: a.nombreActividad || '',
@@ -155,7 +163,9 @@ const DocenteForm = (() => {
   function pasoLaborales(m) {
     return `<div class="form-grid">
       ${campo('tipoContrato', 'Tipo de contrato', select('tipoContrato', m.tipoContrato, catalogos.contratos, '— Elige —'))}
-      <div class="field"><label>Departamento</label><p class="hint">Se asignará cuando exista el catálogo de departamentos.</p></div>
+      ${catalogos.departamentos.length
+        ? campo('departamentoId', 'Departamento', select('departamentoId', m.departamentoId, catalogos.departamentos))
+        : '<div class="field"><label>Departamento</label><p class="hint">Aún no hay departamentos: agrégalos en Configuración → Departamentos.</p></div>'}
     </div>`;
   }
 
@@ -245,7 +255,8 @@ const DocenteForm = (() => {
       nomina: m.nomina, nombres: m.nombres, apellidoPaterno: m.apellidoPaterno, apellidoMaterno: nulo(m.apellidoMaterno),
       curp: nulo(m.curp.toUpperCase()), fechaNacimiento: nulo(m.fechaNacimiento), genero: nulo(m.genero),
       correoInstitucional: nulo(m.correoInstitucional), nivelImparte: nulo(m.nivelImparte), campoFormacion: nulo(m.campoFormacion),
-      trabajoExterno: nulo(m.trabajoExterno), primerSemestre: nulo(m.primerSemestre), tipoContrato: nulo(m.tipoContrato)
+      trabajoExterno: nulo(m.trabajoExterno), primerSemestre: nulo(m.primerSemestre), tipoContrato: nulo(m.tipoContrato),
+      departamentoId: m.departamentoId ? Number(m.departamentoId) : null
     };
     if (m.aceptarCurpConAviso) b.aceptarCurpConAviso = true;
     return b;
@@ -520,7 +531,7 @@ const DocenteForm = (() => {
   }
 
   async function nuevo() {
-    try { await cargarCatalogos(); } catch (err) { UI.toast(err.message, 'error'); return false; }
+    try { await cargarCatalogos(); await cargarDepartamentos(); } catch (err) { UI.toast(err.message, 'error'); return false; }
     return abrirFormulario({ titulo: 'Nuevo docente', modelo: vacio() });
   }
 
@@ -528,6 +539,7 @@ const DocenteForm = (() => {
     let docente;
     try {
       await cargarCatalogos();
+      await cargarDepartamentos();
       ({ docente } = await UI.api(`/docentes/${id}`));
     } catch (err) { UI.toast(err.message, 'error'); return false; }
     return abrirFormulario({ titulo: 'Editar docente', modelo: desdeDetalle(docente), docenteId: id, paso });

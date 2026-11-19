@@ -291,7 +291,8 @@ const Importar = (() => {
           <p class="section-title mt">Títulos</p>
           <div class="table-wrap"><table class="table table-compact"><thead><tr><th>Grado</th><th>Estatus</th><th>Institución</th><th>Periodo</th><th></th></tr></thead><tbody data-titulos>${d.titulos.map(filaT).join('')}</tbody></table></div>
           <button type="button" class="btn btn-ghost btn-sm" data-agregar-t>${UI.icon('plus')}Agregar título</button>
-          ${p.cursos && p.cursos.length ? `<p class="small muted mt"><strong>Cursos:</strong> ${p.cursos.map(e).join(' · ')}</p>` : ''}
+          ${p.cursos && p.cursos.length ? `<p class="section-title mt">Cursos y certificados (${p.cursos.length})</p><ul class="lista-cv small">${p.cursos.map((c) => `<li>${e(c)}</li>`).join('')}</ul>` : ''}
+          ${p.experiencia && p.experiencia.length ? `<p class="section-title mt">Experiencia</p><ul class="lista-cv small">${p.experiencia.map((x) => `<li>${e(x.cargo || (x.asignaturas && x.asignaturas.length ? 'Docente' : '—'))}${x.institucion ? ` · ${e(x.institucion)}` : ''}${x.periodo ? ` · ${e(x.periodo)}` : ''}${x.vigente ? ' <span class="badge badge-success badge-plain">Actual</span>' : ''}</li>`).join('')}</ul>` : ''}
           ${p.idiomas && p.idiomas.length ? `<p class="small muted"><strong>Idiomas:</strong> ${p.idiomas.map(e).join(' · ')}</p>` : ''}`,
         footerHtml: '<button type="button" class="btn btn-outline" data-cancelar>Cancelar</button><button type="button" class="btn btn-primary" data-ok>Usar estos datos</button>',
         onClose: () => resolve(false)

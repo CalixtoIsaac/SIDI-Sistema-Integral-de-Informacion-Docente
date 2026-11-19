@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const lector = require('../lib/cv/lector');
 const fechas = require('../lib/cv/fechas');
-const { TEXTO_CV, pdfCv } = require('./helpers/cv');
+const { TEXTO_CV, TEXTO_CV_REAL, pdfCv } = require('./helpers/cv');
 
 test('fechas libres del CV', () => {
   const hoy = new Date(2026, 10, 11);
@@ -53,7 +53,7 @@ test('leerTexto: CURP con dígito verificador incorrecto se propone con confianz
   assert.deepEqual([p.curp, p.confianza.curp], ['LORM950208MVZPZR09', 'baja']);
 });
 
-test('leerPdf: lee solo las 3 primeras páginas de un PDF real', async () => {
+test('leerPdf: lee las páginas con texto de un PDF real', async () => {
   const p = await lector.leerPdf(await pdfCv(), { archivo: 'cv.pdf' });
   assert.equal(p.curp, 'LORM950208MVZPZR00');
   assert.equal(p.titulos.length, 2);
@@ -65,4 +65,33 @@ test('leerPdf: PDF sin el formato del CV o sin texto → CvNoLegible', async () 
   await assert.rejects(lector.leerPdf(await pdfCv('Factura\nTotal: 100\nGracias por su compra, vuelva pronto, atentamente la tienda')), { name: 'CvNoLegible' });
   await assert.rejects(lector.leerPdf(await pdfCv(' ')), { name: 'CvNoLegible' });
   await assert.rejects(lector.leerPdf(Buffer.from('no es pdf')), { name: 'CvNoLegible' });
+});
+
+test('formato real: etiquetas partidas en renglones, grado del encabezado y "Titulo" = Titulado', () => {
+  const p = lector.leerTexto(TEXTO_CV_REAL);
+  assert.equal(p.nombre, 'Pedro Ejemplo Ficticio');
+  assert.equal(p.correoInstitucional, 'pedro.ejemplo@example.edu.mx');
+  assert.deepEqual(p.titulos, [
+    { grado: 'Licenciatura', nombreTitulo: null, institucion: 'Instituto Ficticio de Veracruz', periodoTexto: '2008-2013', estatus: 'Titulado', cedula: '1234567' },
+    { grado: 'Especialidad', nombreTitulo: null, institucion: 'Universidad Ejemplo', periodoTexto: '2015 a la fecha', estatus: 'Estudios en curso', cedula: null },
+  ]);
+});
+
+test('formato real: cursos con y sin "Nombre del Curso", nombres en dos renglones e idioma vacío', () => {
+  const p = lector.leerTexto(TEXTO_CV_REAL);
+  assert.deepEqual(p.cursos, [
+    'Manejo de la didáctica en un aula invertida (Plataforma Ejemplo, 27/2/2015, 8)',
+    'Evaluación por competencias (Universidad Tecmilenio, 5 agosto 2019, 100)',
+  ]);
+  assert.deepEqual(p.idiomas, ['Inglés (80 %)']);
+});
+
+test('formato real: "Universidad Tec Milenio" no es trabajo externo; experiencia con "a la fecha" = vigente', () => {
+  const p = lector.leerTexto(TEXTO_CV_REAL);
+  assert.equal(p.trabajoExterno, null);
+  assert.deepEqual(p.experiencia, [
+    { institucion: 'Universidad Tec Milenio', cargo: null, asignaturas: ['Química I', 'Lectura y redacción'], periodo: null, vigente: false },
+    { institucion: 'Despacho Ejemplo', cargo: 'Instructor capacitador', asignaturas: [], periodo: 'De agosto 2017 a la fecha vigente', vigente: true },
+    { institucion: 'Comercial Ejemplo', cargo: 'Jefe de almacén', asignaturas: [], periodo: 'Enero- Diciembre 2018', vigente: false },
+  ]);
 });

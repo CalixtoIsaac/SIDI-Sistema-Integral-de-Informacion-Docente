@@ -9,6 +9,7 @@
  * y, si no se mandan, llena fecha de nacimiento y género; si la fecha enviada no coincide con la
  * CURP se marca revisar = 'Fecha de nacimiento ≠ CURP'.
  */
+const departamentos = require('./departamentosService');
 const nomina = require('../lib/nomina');
 const curp = require('../lib/curp');
 const periodos = require('../lib/periodos');
@@ -94,7 +95,10 @@ function columnasDesde(db, body, { parcial, id = null }) {
   if (usar('trabajoExterno')) c.trabajo_externo = v.texto('trabajoExterno', body.trabajoExterno, { max: 300 });
   if (usar('correoInstitucional')) c.correo_institucional = v.texto('correoInstitucional', body.correoInstitucional, { max: 150 });
   if (usar('tipoContrato')) c.tipo_contrato = v.texto('tipoContrato', body.tipoContrato, { max: 50 }) ?? 'determinado';
-  if (usar('departamentoId')) c.departamento_id = v.entero('departamentoId', body.departamentoId, { min: 1 });
+  if (usar('departamentoId')) {
+    c.departamento_id = v.entero('departamentoId', body.departamentoId, { min: 1 });
+    if (c.departamento_id && !departamentos.existe(db, c.departamento_id)) v.error('departamentoId', 'VALOR_INVALIDO');
+  }
   if (usar('primerSemestre')) Object.assign(c, primerSemestre(db, v, body.primerSemestre));
   if (c.correo_institucional && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.correo_institucional)) v.error('correoInstitucional', 'FORMATO');
   v.terminar();

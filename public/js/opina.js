@@ -5,9 +5,12 @@
  *          (promedio de los maestros y calificación del campus) y exportar a Excel.
  *          Clic en un docente → su ficha en Docentes, pestaña OPINA.
  *   HU-08  Importaciones: carga con vista previa e historial.
- *   HU-24  Comparativo del campus → Sprint 3.
+ *   HU-24  Comparativo del campus: % OPP oficial de Preparatoria Veracruz por semestre (captura manual de
+ *          alumnos y opiniones positivas del reporte institucional), variación ▲/▼, gráfica de línea y lo que
+ *          SIDI calcula del OPINA por alumno como referencia.
  *
  * API: GET /api/periodos · GET /api/opina/ranking y /ranking/excel (services/rankingService.js) · /api/opina/importaciones
+ *      GET/PUT/DELETE /api/opina/campus[/:periodoId] (services/opinaCampusService.js)
  */
 const Opina = (() => {
   let el = null;
@@ -30,7 +33,7 @@ const Opina = (() => {
 
   function mount(container, parametros = {}) {
     el = container;
-    pestana = parametros.tab === 'importaciones' ? 'importaciones' : 'ranking';
+    pestana = ['importaciones', 'campus'].includes(parametros.tab) ? parametros.tab : 'ranking';
     filtros = filtrosIniciales();
     container.innerHTML = `
       <section class="page-header">
@@ -42,7 +45,7 @@ const Opina = (() => {
       </section>
       <div class="tabs" role="tablist" aria-label="Secciones de OPINA">
         <button type="button" class="tab" role="tab" data-tab="ranking" aria-controls="opinaPanel">Ranking completo</button>
-        <button type="button" class="tab" role="tab" aria-selected="false" disabled title="Llega en el Sprint 3 (HU-24)">Comparativo del campus</button>
+        <button type="button" class="tab" role="tab" data-tab="campus" aria-controls="opinaPanel">Comparativo del campus</button>
         <button type="button" class="tab" role="tab" data-tab="importaciones" aria-controls="opinaPanel">Importaciones</button>
       </div>
       <div id="opinaPanel" role="tabpanel"></div>`;
@@ -55,7 +58,7 @@ const Opina = (() => {
     el.querySelector('#opinaExcel').addEventListener('click', exportar);
     el.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => {
       pestana = b.dataset.tab;
-      history.replaceState(null, '', pestana === 'ranking' ? '#opina' : '#opina?tab=importaciones');
+      history.replaceState(null, '', pestana === 'ranking' ? '#opina' : `#opina?tab=${pestana}`);
       pintarPestana();
     }));
     cargarPeriodos().then(pintarPestana);
@@ -66,6 +69,7 @@ const Opina = (() => {
     el.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === pestana)));
     el.querySelector('#opinaExcel').hidden = pestana !== 'ranking' || !periodosConOpina().length;
     if (pestana === 'ranking') montarRanking();
+    else if (pestana === 'campus') montarCampus();
     else montarImportaciones();
   }
 
@@ -240,6 +244,109 @@ const Opina = (() => {
       await UI.descargar(`/opina/ranking/excel?${query()}`, 'OPINA_RANKING.xlsx');
       UI.toast('Ranking descargado.', 'success');
     } catch (err) { UI.toast(err.message, 'error'); } finally { UI.setBusy(b, false); }
+  }
+
+  // ------------------------------------------------------------------ comparativo del campus (HU-24)
+  const pct1 = (v) => (v === null || v === undefined ? '—' : `${Number(v).toFixed(1)} %`);
+
+  /** Gráfica de línea: % OPP oficial y, si hay, el de la región (punteada). */
+  function lineaOpp(semestres) {
+    if (semestres.length < 2) return '<p class="muted small grafica-vacia">Captura al menos dos semestres para ver la tendencia.</p>';
+    const hayRegion = semestres.some((sm) => sm.regionOpp !== null && sm.regionOpp !== undefined);
+    return Graficas.linea({
+      etiquetas: semestres.map((sm) => sm.periodo),
+      series: [{ nombre: 'Preparatoria Veracruz', valores: semestres.map((sm) => sm.opp) },
+        ...(hayRegion ? [{ nombre: 'Región', valores: semestres.map((sm) => sm.regionOpp) }] : [])],
+      formato: (v) => `${Number(v).toFixed(1).replace(/\.0$/, '')} %`
+    }) + Graficas.leyenda([{ etiqueta: 'Preparatoria Veracruz', tono: 'primario' }, ...(hayRegion ? [{ etiqueta: 'Región', tono: 'neutro' }] : [])]);
+  }
+
+  function cambio(sm) {
+    if (sm.variacion === null || sm.variacion === undefined) return '<span class="cell-muted">—</span>';
+    if (sm.tendencia === 'igual') return '<span class="cambio igual">= 0.0</span>';
+    const sube = sm.tendencia === 'sube';
+    return `<span class="cambio ${sube ? 'sube' : 'baja'}">${sube ? '▲' : '▼'} ${Math.abs(sm.variacion).toFixed(1)}</span>`;
+  }
+
+  async function montarCampus() {
+    const box = el.querySelector('#opinaPanel');
+    box.innerHTML = '<section class="card"><div class="card-body"><span class="skeleton" style="height:160px"></span></div></section>';
+    let datos;
+    try { datos = await UI.api('/opina/campus'); } catch (err) {
+      box.innerHTML = `<div class="alert alert-error">${UI.escape(err.message)}</div>`;
+      return;
+    }
+    if (pestana !== 'campus' || !el?.isConnected) return;
+    const { semestres, promedio, ultimo, sinCaptura } = datos;
+    box.innerHTML = `
+      <div class="stats">
+        ${Comun.stat('Último semestre', ultimo ? pct1(ultimo.opp) : '—', { sub: ultimo ? UI.escape(ultimo.periodo) : 'Sin captura', icono: 'star' })}
+        ${Comun.stat('Cambio', ultimo ? cambio(ultimo) : '—', { sub: 'contra el semestre anterior', icono: 'chart', tono: 'tone-info' })}
+        ${Comun.stat('Promedio', pct1(promedio), { sub: `${semestres.length} semestre(s) capturado(s)`, icono: 'chart', tono: 'tone-success' })}
+      </div>
+      <section class="card mt">
+        <div class="card-header"><div><h3>% OPP de Preparatoria Veracruz por semestre</h3>
+          <p class="card-sub">Cifra oficial: alumnos y opiniones positivas de la fila Preparatoria → Veracruz del reporte institucional.</p></div>
+          <button type="button" class="btn btn-primary" data-campus-nuevo ${sinCaptura.length ? '' : 'disabled title="Todos los semestres ya tienen captura"'}>${UI.icon('plus')}Capturar semestre</button></div>
+        <div class="card-body">${lineaOpp(semestres)}</div>
+        ${semestres.length ? `
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>Semestre</th><th class="num">Alumnos</th><th class="num">Opiniones positivas</th><th class="num">% OPP</th><th>Cambio</th>
+            <th class="num">Región</th><th class="num" title="Lo que SIDI calcula del OPINA por alumno (solo presencial Veracruz). Puede diferir un poco de la cifra oficial.">Calculado por SIDI</th><th>Fuente</th><th></th></tr></thead>
+          <tbody>${semestres.slice().reverse().map((sm) => `
+            <tr>
+              <td><strong>${UI.escape(sm.periodo)}</strong></td>
+              <td class="num">${sm.alumnos.toLocaleString('es-MX')}</td>
+              <td class="num">${sm.positivas.toLocaleString('es-MX')}</td>
+              <td class="num"><strong>${pct1(sm.opp)}</strong></td>
+              <td>${cambio(sm)}</td>
+              <td class="num">${pct1(sm.regionOpp)}</td>
+              <td class="num">${sm.opinaAlumnos ? `${pct1(sm.opinaAlumnos.calificacionCampus)}<div class="small muted">prom. maestros ${pct1(sm.opinaAlumnos.promedioMaestros)}</div>` : '<span class="cell-muted" title="No se importó el OPINA por alumno de ese semestre">—</span>'}</td>
+              <td class="small">${UI.guion(sm.fuente)}</td>
+              <td class="nowrap">
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" data-campus-editar="${sm.periodoId}" aria-label="Editar ${UI.escape(sm.periodo)}">${UI.icon('pencil')}</button>
+                <button type="button" class="btn btn-ghost btn-icon btn-sm btn-danger-ghost" data-campus-borrar="${sm.periodoId}" aria-label="Borrar ${UI.escape(sm.periodo)}">${UI.icon('trash')}</button></td>
+            </tr>`).join('')}</tbody>
+        </table></div>` : `<div class="empty-state"><p class="muted">Aún no hay semestres capturados.</p></div>`}
+      </section>
+      <p class="muted small mt">% OPP = opiniones positivas ÷ alumnos. "Calculado por SIDI" es solo referencia: sale del OPINA por alumno importado y puede no coincidir con la cifra oficial.</p>`;
+
+    box.querySelector('[data-campus-nuevo]').addEventListener('click', () => capturarCampus(null, sinCaptura));
+    box.querySelectorAll('[data-campus-editar]').forEach((b) => b.addEventListener('click', () => {
+      capturarCampus(semestres.find((sm) => String(sm.periodoId) === b.dataset.campusEditar), sinCaptura);
+    }));
+    box.querySelectorAll('[data-campus-borrar]').forEach((b) => b.addEventListener('click', async () => {
+      const sm = semestres.find((x) => String(x.periodoId) === b.dataset.campusBorrar);
+      if (!(await UI.confirm({ title: `¿Borrar el % OPP de ${sm.periodo}?`, message: 'Se quita la captura de ese semestre. Puedes volver a capturarla después.', confirmText: 'Borrar', danger: true }))) return;
+      try {
+        await UI.api(`/opina/campus/${sm.periodoId}`, { method: 'DELETE' });
+        UI.toast(`Se borró ${sm.periodo}.`, 'success');
+        montarCampus();
+      } catch (err) { UI.toast(err.message, 'error'); }
+    }));
+  }
+
+  async function capturarCampus(semestre, sinCaptura) {
+    const fields = [
+      ...(semestre ? [] : [{ name: 'periodoId', label: 'Semestre', type: 'select', required: true, options: sinCaptura.map((p) => ({ value: p.periodoId, label: p.periodo })) }]),
+      { name: 'alumnos', label: 'Alumnos (respuestas totales)', type: 'number', min: 1, step: '1', required: true },
+      { name: 'positivas', label: 'Opiniones positivas', type: 'number', min: 0, step: '1', required: true },
+      { name: 'regionOpp', label: '% OPP de la región (opcional)', type: 'number', min: 0, step: '0.1', hint: 'Para comparar el campus contra la región.' },
+      { name: 'fuente', label: 'Fuente (opcional)', maxlength: 120, placeholder: 'Ej. Reporte institucional OPINA ENE-MAY 2026' }
+    ];
+    const r = await UI.formModal({
+      title: semestre ? `% OPP de ${semestre.periodo}` : 'Capturar % OPP del campus',
+      description: 'Copia los dos números de la fila Preparatoria → Veracruz del reporte institucional. El % se calcula solo.',
+      fields,
+      values: semestre
+        ? { alumnos: semestre.alumnos, positivas: semestre.positivas, regionOpp: semestre.regionOpp ?? '', fuente: semestre.fuente || '' }
+        : { periodoId: sinCaptura.length ? sinCaptura[sinCaptura.length - 1].periodoId : '', alumnos: '', positivas: '', regionOpp: '', fuente: '' },
+      onSubmit: (v) => UI.api(`/opina/campus/${semestre ? semestre.periodoId : v.periodoId}`, {
+        method: 'PUT',
+        body: { alumnos: Number(v.alumnos), positivas: Number(v.positivas), regionOpp: v.regionOpp === '' ? null : Number(v.regionOpp), fuente: v.fuente || null }
+      })
+    });
+    if (r) { UI.toast(`Se guardó el % OPP: ${pct1(r.semestre.opp)}.`, 'success'); montarCampus(); }
   }
 
   // ------------------------------------------------------------------ importaciones (HU-08)

@@ -10,6 +10,7 @@
  *  POST /api/reportes/enviar   { quincenaId, modo?, para?, cc?, cco?, asunto?, cuerpo?, excluir?, excluirIncidencias? } (HU-25)
  *                              → borrador: descarga Reportes PREPA Qnn.eml (X-Unsent, los 2 Excel adjuntos)
  *                              → mailto: { mailto, archivos: [{ nombre, url }], envioId, asunto } · 400 AVISOS_ROJOS
+ *  GET  /api/reportes/enviar/vista-previa?quincenaId=&excluir=&excluirIncidencias= → correo que se armaría (sin generar nada)
  *  GET  /api/reportes/envios?quincenaId= → bitácora de envíos (HU-25)
  */
 const express = require('express');
@@ -38,6 +39,7 @@ router.get('/incidencias', (req, res, next) => {
     .then((r) => descargar(res, r)).catch(next);
 });
 
+router.get('/enviar/vista-previa', (req, res) => res.json(envioService.vistaPrevia(db, req.query)));
 router.post('/enviar', (req, res, next) => {
   envioService.enviar(db, req.body ?? {}).then((r) => {
     if (r.modo === 'mailto') return res.json({ mailto: r.mailto, archivos: r.archivos, envioId: r.envioId, asunto: r.asunto });

@@ -40,6 +40,7 @@ app.use('/api/titulos', require('./routes/titulos'));
 app.use('/api/asignaturas', require('./routes/asignaturas'));
 app.use('/api/tipos-clase', require('./routes/catalogos').tiposClase);
 app.use('/api/catalogos', require('./routes/catalogos').catalogos);
+app.use('/api/departamentos', require('./routes/departamentos'));
 app.use('/api/contratos', require('./routes/contratos'));
 app.use('/api/faltas', require('./routes/faltas'));
 app.use('/api/periodos', require('./routes/periodos'));
@@ -48,6 +49,7 @@ app.use('/api/reportes', require('./routes/reportes'));
 app.use('/api/incidencias', require('./routes/incidencias'));
 app.use('/api/analitica', require('./routes/analitica'));
 app.use('/api/configuracion', require('./routes/configuracion'));
+app.use('/api/respaldo', require('./routes/respaldo'));
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta de la API no encontrada.' }));
 

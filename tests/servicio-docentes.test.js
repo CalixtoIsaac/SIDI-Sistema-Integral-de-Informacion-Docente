@@ -104,3 +104,24 @@ test('archivoCv: 404 sin CV, ruta dentro de data/cv y bloqueo de rutas fuera', (
     fs.rmSync(archivo, { force: true });
   }
 });
+
+test('lista: conteos por estado con los mismos filtros, filtro incompleto y páginas', () => {
+  const { crearEscenario: esc } = require('./helpers/escenario');
+  const filtrosDoc = require('../services/filtrosDocentes');
+  const docentesSvc = require('../services/docentesService');
+  const { db, ids } = esc();
+  db.prepare('UPDATE docentes SET activo = 0 WHERE id = ?').run(ids.ana);
+  const listar = (q) => docentesSvc.listar(db, q, { filtrar: filtrosDoc.filtrar, comparar: filtrosDoc.comparador(q) });
+  const todos = listar({});
+  assert.equal(todos.conteos.todos, todos.total);
+  assert.equal(todos.conteos.activos + todos.conteos.inactivos, todos.conteos.todos);
+  const inactivos = listar({ activo: 'false' });
+  assert.deepEqual(inactivos.docentes.map((d) => d.id), [ids.ana]);
+  assert.deepEqual(inactivos.conteos, todos.conteos); // el filtro de estado no cambia los conteos
+  const incompletos = listar({ incompleto: 'true' });
+  assert.equal(incompletos.total, todos.conteos.incompletos);
+  assert.ok(incompletos.docentes.every((d) => d.incompleto.length > 0));
+  const pag = listar({ limit: '2', page: '2' });
+  assert.equal(pag.paginas, Math.ceil(todos.total / 2));
+  assert.ok(pag.docentes.length <= 2);
+});

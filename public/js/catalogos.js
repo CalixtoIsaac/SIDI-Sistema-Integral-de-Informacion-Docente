@@ -5,6 +5,8 @@
  *   HU-27  Contratos: descargar plantilla / subir reporte del periodo + historial.
  *   HU-21  Motivos de baja con recontratable sugerido.
  *   Extras de 05 §9: grupos que se omiten (en línea) y parámetros de OPINA (via /configuracion).
+ *   HU-25  Correo a Nacional: destinatarios, asunto y cuerpo con variables, modo y "preguntar al cerrar".
+ *   Departamentos: catálogo para la ficha del docente (Laborales).
  * Cambiar una tarifa no cambia faltas ya registradas (cada falta guarda su monto).
  */
 const Catalogos = (() => {
@@ -29,7 +31,7 @@ const Catalogos = (() => {
   function plantilla() {
     return `
       <section class="page-header">
-        <div><h2>Configuración</h2><p class="muted">Tarifas, catálogos, contratos y motivos de baja.</p></div>
+        <div><h2>Configuración</h2><p class="muted">Tarifas, catálogos, contratos, motivos de baja, correo a Nacional y departamentos.</p></div>
       </section>
 
       <section class="card" id="cfgTarifas">
@@ -85,6 +87,31 @@ const Catalogos = (() => {
             <label class="check full"><input type="checkbox" name="presencial">Solo grupos presenciales</label>
             <div class="full"><button type="submit" class="btn btn-outline">${UI.icon('check')}Guardar</button></div>
           </form>
+        </section>
+      </div>
+
+      <div class="grid-2 mt">
+        <section class="card" id="cfgCorreo">
+          <div class="card-header"><div><h3>Correo a Nacional</h3>
+            <p class="card-sub">Lo usa "Enviar a Nacional" en Reportes. Variables: {quincena} {periodo} {fecha_pago} {total_descontado} {num_faltas} {num_pagos}.</p></div></div>
+          <form class="card-body form-grid" data-form="correo">
+            <div class="field full"><label for="cfgPara">Para <span class="req">*</span></label><input class="input" id="cfgPara" name="para" placeholder="correo1@tecmilenio.mx; correo2@tecmilenio.mx"></div>
+            <div class="field"><label for="cfgCc">CC</label><input class="input" id="cfgCc" name="cc"></div>
+            <div class="field"><label for="cfgCco">CCO</label><input class="input" id="cfgCco" name="cco"></div>
+            <div class="field full"><label for="cfgAsunto">Asunto <span class="req">*</span></label><input class="input" id="cfgAsunto" name="asunto" maxlength="200"></div>
+            <div class="field full"><label for="cfgCuerpo">Cuerpo</label><textarea class="input textarea" id="cfgCuerpo" name="cuerpo" rows="8" maxlength="5000"></textarea></div>
+            <div class="field"><label for="cfgModo">Cómo se abre</label><div class="select-wrap"><select class="input select" id="cfgModo" name="modo">
+              <option value="borrador">Borrador de Outlook (.eml con los 2 archivos)</option>
+              <option value="mailto">Mi programa de correo (adjunto los archivos a mano)</option></select></div></div>
+            <label class="check"><input type="checkbox" name="alCerrar">Al cerrar la quincena, preguntar si ya se envió</label>
+            <div class="full"><button type="submit" class="btn btn-outline">${UI.icon('check')}Guardar</button></div>
+          </form>
+        </section>
+
+        <section class="card" id="cfgDepartamentos">
+          <div class="card-header"><div><h3>Departamentos</h3><p class="card-sub">Se eligen en la ficha del docente (Laborales).</p></div>
+            <button type="button" class="btn btn-outline btn-sm" data-accion="nuevo-depto">${UI.icon('plus')}Agregar</button></div>
+          <div data-cuerpo></div>
         </section>
       </div>`;
   }
@@ -217,7 +244,40 @@ const Catalogos = (() => {
       el.querySelector('[name="muestra"]').value = c['opina.muestra_minima'] || 10;
       el.querySelector('[name="campus"]').value = c['opina.campus'] || '';
       el.querySelector('[name="presencial"]').checked = c['opina.solo_presencial'] === '1';
+      const f = el.querySelector('[data-form="correo"]');
+      f.para.value = (c['correo.para'] || '').split(';').filter(Boolean).join('; ');
+      f.cc.value = (c['correo.cc'] || '').split(';').filter(Boolean).join('; ');
+      f.cco.value = (c['correo.cco'] || '').split(';').filter(Boolean).join('; ');
+      f.asunto.value = c['correo.asunto'] || '';
+      f.cuerpo.value = c['correo.cuerpo'] || '';
+      f.modo.value = c['correo.modo'] || 'borrador';
+      f.alCerrar.checked = c['correo.enviar_al_cerrar'] === '1';
     } catch { /* se queda vacío */ }
+  }
+
+  // ------------------------------------------------------------------ departamentos
+  async function cargarDepartamentos() {
+    const box = el.querySelector('#cfgDepartamentos [data-cuerpo]');
+    try {
+      const { departamentos } = await UI.api('/departamentos');
+      box._deptos = departamentos;
+      box.innerHTML = departamentos.length
+        ? `<div class="table-wrap"><table class="table table-compact"><thead><tr><th>Departamento</th><th class="num">Docentes</th><th></th></tr></thead>
+            <tbody>${departamentos.map((d) => `<tr><td>${e(d.nombre)}</td><td class="num">${d.docentes}</td>
+              <td class="nowrap"><button type="button" class="btn btn-ghost btn-icon btn-sm" data-editar-depto="${d.id}" aria-label="Renombrar ${e(d.nombre)}">${UI.icon('pencil')}</button>
+              <button type="button" class="btn btn-ghost btn-icon btn-sm btn-danger-ghost" data-borrar-depto="${d.id}" aria-label="Borrar ${e(d.nombre)}" ${d.docentes ? 'disabled title="Tiene docentes asignados"' : ''}>${UI.icon('trash')}</button></td></tr>`).join('')}</tbody></table></div>`
+        : '<div class="card-body"><p class="muted">Aún no hay departamentos. Agrega los de la lista oficial.</p></div>';
+    } catch (err) { box.innerHTML = `<div class="card-body"><div class="alert alert-error">${e(err.message)}</div></div>`; }
+  }
+
+  async function formularioDepto(depto = null) {
+    const r = await UI.formModal({
+      title: depto ? 'Renombrar departamento' : 'Nuevo departamento',
+      fields: [{ name: 'nombre', label: 'Nombre', required: true, maxlength: 80 }],
+      values: { nombre: depto ? depto.nombre : '' },
+      onSubmit: (v) => UI.api(depto ? `/departamentos/${depto.id}` : '/departamentos', { method: depto ? 'PUT' : 'POST', body: { nombre: v.nombre } })
+    });
+    if (r) { UI.toast('Departamento guardado.', 'success'); cargarDepartamentos(); }
   }
 
   // ------------------------------------------------------------------ eventos
@@ -257,6 +317,21 @@ const Catalogos = (() => {
         const r = await UI.formModal({ title: 'Renombrar motivo', fields: [{ name: 'valor', label: 'Motivo', required: true, maxlength: 200 }], values: { valor: x.dataset.valor },
           onSubmit: (v) => UI.api(`/catalogos/${x.dataset.editarValor}`, { method: 'PUT', body: { valor: v.valor } }) });
         if (r) { UI.toast('Motivo guardado.', 'success'); cargarMotivos(); }
+        return;
+      }
+      if (b('[data-accion="nuevo-depto"]')) { await formularioDepto(); return; }
+      if (b('[data-editar-depto]')) {
+        const id = Number(b('[data-editar-depto]').dataset.editarDepto);
+        await formularioDepto(el.querySelector('#cfgDepartamentos [data-cuerpo]')._deptos.find((d) => d.id === id));
+        return;
+      }
+      if (b('[data-borrar-depto]')) {
+        const id = Number(b('[data-borrar-depto]').dataset.borrarDepto);
+        const d = el.querySelector('#cfgDepartamentos [data-cuerpo]')._deptos.find((x) => x.id === id);
+        if (!(await UI.confirm({ title: `¿Borrar "${d.nombre}"?`, confirmText: 'Borrar', danger: true }))) return;
+        await UI.api(`/departamentos/${id}`, { method: 'DELETE' });
+        UI.toast('Departamento borrado.', 'success');
+        cargarDepartamentos();
         return;
       }
       if (b('[data-accion="nuevo-motivo"]')) {
@@ -303,6 +378,18 @@ const Catalogos = (() => {
         UI.toast('Grupos a omitir guardados.', 'success');
       } catch (err) { UI.toast(err.message, 'error'); }
     });
+    el.querySelector('[data-form="correo"]').addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const f = ev.target;
+      try {
+        await App.guardarConfiguracion({
+          'correo.para': f.para.value, 'correo.cc': f.cc.value, 'correo.cco': f.cco.value,
+          'correo.asunto': f.asunto.value, 'correo.cuerpo': f.cuerpo.value, 'correo.modo': f.modo.value,
+          'correo.enviar_al_cerrar': f.alCerrar.checked ? '1' : '0'
+        });
+        UI.toast('Correo a Nacional guardado.', 'success');
+      } catch (err) { UI.toast(UI.listaErrores(err).lineas[0] || err.message, 'error'); }
+    });
     el.querySelector('[data-form="opina"]').addEventListener('submit', async (ev) => {
       ev.preventDefault();
       const f = ev.target;
@@ -322,6 +409,7 @@ const Catalogos = (() => {
     cargarMotivos();
     cargarCatalogo();
     cargarConfig();
+    cargarDepartamentos();
   }
 
   return { mount };

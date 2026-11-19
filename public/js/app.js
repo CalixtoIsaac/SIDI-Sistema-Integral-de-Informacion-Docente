@@ -35,6 +35,7 @@ const App = (() => {
     incidencias: { title: 'Incidencias', module: () => Incidencias },
     opina: { title: 'OPINA', module: () => Opina },
     reportes: { title: 'Reportes', module: () => Reportes },
+    resumen: { title: 'Resumen ejecutivo', module: () => Resumen, menu: 'panel' },
     configuracion: { title: 'Configuración', module: () => Catalogos },
     perfil: { title: 'Perfil', module: () => Perfil }
   };
@@ -43,7 +44,7 @@ const App = (() => {
 
   UI.hydrateIcons(document);
 
-  // ---------- Menú lateral (móvil) ----------
+  // ---------- Menú lateral (móvil: se abre encima) ----------
   const sidebar = $('sidebar');
   const backdrop = $('sidebarBackdrop');
   const menuBtn = $('menuBtn');
@@ -54,6 +55,20 @@ const App = (() => {
   }
   menuBtn.addEventListener('click', () => setSidebar(!sidebar.classList.contains('open')));
   backdrop.addEventListener('click', () => setSidebar(false));
+
+  // ---------- Menú lateral contraído (escritorio): solo iconos; se recuerda en este navegador ----------
+  const colapsarBtn = $('colapsarBtn');
+  const shell = document.querySelector('.app-shell');
+  function setColapsado(si) {
+    shell.classList.toggle('sidebar-colapsado', si);
+    colapsarBtn.setAttribute('aria-pressed', String(si));
+    const texto = si ? 'Expandir menú' : 'Contraer menú';
+    colapsarBtn.setAttribute('aria-label', texto);
+    colapsarBtn.title = texto;
+    UI.store.set('sidi.menu.colapsado', si);
+  }
+  setColapsado(Boolean(UI.store.get('sidi.menu.colapsado', false)));
+  colapsarBtn.addEventListener('click', () => setColapsado(!shell.classList.contains('sidebar-colapsado')));
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && sidebar.classList.contains('open')) setSidebar(false);
   });
@@ -111,7 +126,7 @@ const App = (() => {
     const view = VIEWS[clave];
 
     document.querySelectorAll('[data-view]').forEach((link) => {
-      const active = link.dataset.view === clave;
+      const active = link.dataset.view === (view.menu || clave);
       link.classList.toggle('active', active);
       if (active) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');

@@ -1,33 +1,45 @@
 /**
  * Vista Docentes (05 §2 y §4).
  *
- *  HU-03  Tabla con los 12 campos de consulta (+ OPINA y Faltas) y selector de columnas (se recuerda).
- *  HU-04  Resumen al pasar el mouse (nómina, contratos, CRN del semestre) y ficha extendida con pestañas:
- *         tarifa diaria y, a su derecha, la mensual; total mensual; botón Ver CV.
- *  HU-05  Punto verde/gris de estatus; Suspender / Reactivar con confirmación.
- *  HU-21  Modal de baja (motivo, observaciones, recontratable sugerido) e insignia "Recontratable".
- *  HU-06  Filtros combinables con chips (incluye Recontratable) y orden.
- *  HU-07  Búsqueda por nombre, CURP, nómina (con o sin L0) o CRN mientras se escribe.
- *  HU-19  Pestaña "Asignaturas y horarios": departamento, tabla de CRN y vista semanal del horario.
+ *  Lista (revisión de equipo 19/11):
+ *    - Solo lo más relevante: nombre, nómina, grupos, antigüedad, OPINA, faltas y estado.
+ *      El resto (CURP, edad, formación, trabajo externo…) vive en la ficha.
+ *    - Paginada: las filas por página se calculan con el alto de la ventana para que la tabla
+ *      se vea completa sin desplazarse (mínimo 5, máximo 30). Pestañas Todos · Activos · Inactivos ·
+ *      Datos incompletos con sus conteos (GET /docentes → conteos, paginas).
+ *  Ficha a pantalla completa (#docentes?ficha=<id>&pestana=<clave>): encabezado con avatar, acciones e
+ *  indicadores; pestañas Asignaturas y horario · Datos personales · Formación · OPINA · Faltas · Bajas.
+ *  "Volver a docentes" regresa a la misma página, filtros y búsqueda.
  *
- * Toda la búsqueda, filtros y orden los resuelve GET /api/docentes (services/filtrosDocentes.js).
+ *  HU-03/04  consulta y ficha extendida (tarifa diaria y mensual, total mensual, Ver CV)
+ *  HU-05/21  punto verde/gris, Suspender / Reactivar con motivo, observaciones y recontratable
+ *  HU-06/07  filtros con chips, orden y búsqueda por nombre, CURP, nómina (con o sin L0) o CRN
+ *  HU-19     asignaturas y vista semanal del horario
+ *  OPINA     GET /docentes/:id/opina (global, por CRN, reactivos v2, razones y comentarios)
  */
 const Docentes = (() => {
-  const KEY_COLUMNAS = 'sidi.docentes.columnas';
   const DIAS = ['', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
   const ORIGEN = { excel_grupos: 'Excel de grupos', cv: 'CV', manual: 'Captura manual', opina: 'OPINA', alta_rapida: 'Alta rápida' };
   const FALTANTE = {
     curp: 'CURP', campoFormacion: 'campo de formación', primerSemestre: 'primer semestre', contrato: 'contrato de algún CRN'
   };
+  const PASO_FALTANTE = { curp: 'personales', campoFormacion: 'formacion', primerSemestre: 'formacion', contrato: 'asignaturas' };
 
   const ORDENES = [
     ['nombre', 'Alfabético'], ['edad', 'Edad'], ['antiguedad', 'Antigüedad'], ['grupos', 'Número de grupos'],
     ['nivelEstudios', 'Nivel de estudios'], ['opina', 'OPINA']
   ];
 
+  /** Pestañas de estado sobre la tabla (el conteo lo da GET /docentes → conteos). */
+  const ESTADOS = [
+    { clave: 'todos', etiqueta: 'Todos', conteo: 'todos', query: {} },
+    { clave: 'activos', etiqueta: 'Activos', conteo: 'activos', query: { activo: 'true' }, icono: 'userCheck' },
+    { clave: 'inactivos', etiqueta: 'Inactivos', conteo: 'inactivos', query: { activo: 'false' }, icono: 'userX' },
+    { clave: 'incompletos', etiqueta: 'Datos incompletos', conteo: 'incompletos', query: { incompleto: 'true' }, icono: 'warning' }
+  ];
+
   /** Filtros de la barra (06 GET /docentes). tipo: uno | varios | rango (rango → <clave>Min/<clave>Max). */
   const FILTROS = [
-    { clave: 'activo', etiqueta: 'Estatus', tipo: 'uno', opciones: [['true', 'Activos'], ['false', 'Inactivos']] },
     { clave: 'genero', etiqueta: 'Género', tipo: 'varios', opciones: [['F', 'Femenino'], ['M', 'Masculino'], ['ninguno', 'Sin dato']] },
     { clave: 'nivelEstudios', etiqueta: 'Nivel de estudios', tipo: 'varios', catalogo: 'nivel_estudios', opciones: [] },
     { clave: 'campo', etiqueta: 'Campo de formación', tipo: 'varios', catalogo: 'campo_formacion', opciones: [] },
@@ -38,43 +50,35 @@ const Docentes = (() => {
     { clave: 'nivelImparte', etiqueta: 'Nivel que imparte', tipo: 'varios', opciones: [['Bachillerato General', 'Bachillerato General'], ['Bachillerato General Bilingüe', 'Bachillerato General Bilingüe'], ['Profesional', 'Profesional'], ['ninguno', 'Sin dato']] }
   ];
 
-  // ------------------------------------------------------------------ columnas (HU-03)
-  const COLUMNAS = [
-    { clave: 'nomina', etiqueta: 'Nómina', defecto: true, celda: (d) => `<span class="nowrap">${UI.escape(d.nomina)}</span>` },
-    { clave: 'edad', etiqueta: 'Edad', defecto: true, orden: 'edad', num: true, celda: (d) => UI.guion(d.edad) },
-    { clave: 'genero', etiqueta: 'Género', defecto: true, celda: (d) => UI.guion(d.genero) },
-    { clave: 'curp', etiqueta: 'CURP', defecto: true, celda: (d) => (d.curp ? `<span title="${UI.escape(d.curp)}">${UI.escape(d.curp.slice(0, 10))}…</span>` : '—') },
-    { clave: 'numGrupos', etiqueta: 'Grupos', defecto: true, orden: 'grupos', num: true, celda: (d) => d.numGrupos },
-    { clave: 'grupos', etiqueta: 'Grupos asignados', defecto: true, celda: celdaGrupos },
-    { clave: 'nivelEstudios', etiqueta: 'Nivel de estudios', defecto: true, orden: 'nivelEstudios', celda: (d) => UI.guion(d.nivelEstudios) },
-    { clave: 'campoFormacion', etiqueta: 'Campo de formación', defecto: true, celda: (d) => UI.guion(d.campoFormacion) },
-    { clave: 'antiguedad', etiqueta: 'Antigüedad', defecto: true, orden: 'antiguedad', celda: celdaAntiguedad },
-    { clave: 'estudiando', etiqueta: 'Estudiando', defecto: true, celda: (d) => (d.estudiando.si ? `Sí${d.estudiando.nivel ? ` · ${UI.escape(d.estudiando.nivel)}` : ''}` : 'No') },
-    { clave: 'trabajoExterno', etiqueta: 'Trabajo externo', defecto: true, celda: (d) => UI.guion(d.trabajoExterno) },
-    { clave: 'opina', etiqueta: 'OPINA', defecto: true, orden: 'opina', num: true, celda: celdaOpina },
-    { clave: 'faltas', etiqueta: 'Faltas', defecto: true, num: true, celda: (d) => d.faltas },
-    { clave: 'cumpleanos', etiqueta: 'Cumpleaños', defecto: false, celda: (d) => (d.cumpleanos ? UI.escape(cumple(d.cumpleanos)) : '—') },
-    { clave: 'nivelImparte', etiqueta: 'Nivel que imparte', defecto: false, celda: (d) => UI.guion(d.nivelImparte) }
+  const PESTANAS = [
+    ['asignaturas', 'Asignaturas y horario'], ['personales', 'Datos personales'], ['formacion', 'Formación y trayectoria'],
+    ['opina', 'OPINA'], ['faltas', 'Faltas y suplencias'], ['bajas', 'Historial de bajas']
   ];
 
-  let el = null;
-  let estado = null;
-  const cacheResumen = new Map();
+  // Alto de fila fijo (CSS .docentes-table tbody td) para calcular cuántas caben en pantalla
+  const ALTO_FILA = 49;
+  const FILAS_MIN = 4;
+  const FILAS_MAX = 30;
 
-  function estadoInicial(parametros = {}) {
-    return {
-      search: parametros.search || '',
-      semestreActual: false,
-      filtros: {},
-      ordenar: 'nombre',
-      orden: 'asc',
-      columnas: UI.store.get(KEY_COLUMNAS, null) || COLUMNAS.filter((c) => c.defecto).map((c) => c.clave),
-      // #docentes?ficha=<id>&pestana=opina abre la ficha al cargar (desde el ranking de OPINA o el Panel)
-      expandido: Number(parametros.ficha) || null,
-      pestana: PESTANAS.some(([k]) => k === parametros.pestana) ? parametros.pestana : 'personales',
-      datos: null,
-      peticion: 0
-    };
+  let el = null;
+  let estado = null;      // estado de la vista montada (lista o ficha)
+  /** Lo que se recuerda al ir a una ficha y volver: búsqueda, filtros, orden, pestaña y página. */
+  const memoria = { lista: null, desdeLista: false };
+  const cacheResumen = new Map();
+  const cacheOpina = new Map();
+
+  function estadoLista(parametros = {}) {
+    const previo = memoria.lista;
+    const base = previo && parametros.search === undefined
+      ? { ...previo, filtros: { ...previo.filtros } }
+      : { search: parametros.search || '', semestreActual: false, filtros: {}, ordenar: 'nombre', orden: 'asc', estado: 'todos', page: 1, verFiltros: false };
+    return { ...base, limit: FILAS_MIN, datos: null, peticion: 0 };
+  }
+
+  function recordarLista() {
+    if (!estado || estado.vista !== 'lista') return;
+    const { search, semestreActual, filtros, ordenar, orden, page, verFiltros } = estado;
+    memoria.lista = { search, semestreActual, filtros: { ...filtros }, ordenar, orden, estado: estado.estado, page, verFiltros };
   }
 
   // ------------------------------------------------------------------ celdas
@@ -84,47 +88,42 @@ const Docentes = (() => {
     return `${Number(d)} ${mes}`;
   }
 
-  function celdaGrupos(d) {
-    if (!d.grupos.length) return '—';
-    const crns = d.grupos.map((g) => g.crn || g.materia);
-    const visibles = crns.slice(0, 3).join(', ') + (crns.length > 3 ? '…' : '');
-    const lista = d.grupos.map((g) => [g.crn || 'Actividad', g.materia, g.numeroGrupo, g.horario].filter(Boolean).join(' · ')).join('\n');
-    return `<span class="crn-list" title="${UI.escape(lista)}">${UI.escape(visibles)}</span>`;
+  /** OPINA con punto de color: < 70 rojo (zona de riesgo, G2), 70–84.9 ámbar, ≥ 85 verde. */
+  function tonoOpina(p) { return p < 70 ? 'alerta' : p < 85 ? 'pendiente' : 'ok'; }
+  /** Faltas del semestre: 0 gris, 1–2 ámbar, 3 o más rojo. */
+  function tonoFaltas(n) { return n >= 3 ? 'alerta' : n > 0 ? 'pendiente' : 'neutro'; }
+
+  function valorOpina(d) {
+    if (!d.opina) return '<span class="cell-muted">—</span>';
+    if (d.opina.muestraInsuficiente) {
+      return `<span class="valor-tono neutro" title="Muestra insuficiente (${d.opina.respuestas} respuestas)">${UI.porcentaje(d.opina.porcentaje)}*</span>`;
+    }
+    return `<span class="valor-tono ${tonoOpina(d.opina.porcentaje)}" title="${d.opina.respuestas} respuestas">${UI.porcentaje(d.opina.porcentaje)}</span>`;
   }
 
-  function celdaAntiguedad(d) {
-    if (d.antiguedad) return `<span title="Desde ${UI.escape(d.antiguedad.desde)}">${UI.escape(d.antiguedad.texto)}</span>`;
-    return `— <button type="button" class="link-btn small" data-accion="capturar" data-paso="formacion" data-id="${d.id}">Capturar primer semestre</button>`;
+  function valorFaltas(n) {
+    return `<span class="valor-tono ${tonoFaltas(n)}">${n}</span>`;
   }
 
-  function celdaOpina(d) {
-    if (!d.opina) return '—';
-    const texto = UI.porcentaje(d.opina.porcentaje);
-    return d.opina.muestraInsuficiente
-      ? `<span class="opina-baja" title="Muestra insuficiente (${d.opina.respuestas} respuestas)">${texto}</span>`
-      : `<span title="${d.opina.respuestas} respuestas">${texto}</span>`;
+  function insigniaEstado(d) {
+    if (d.activo) return `<span class="badge badge-success">${UI.icon('userCheck')}Activo</span>`;
+    if (d.recontratable === false) return `<span class="badge badge-danger">${UI.icon('userX')}No recontratable</span>`;
+    return `<span class="badge badge-neutro">${UI.icon('userX')}Inactivo${d.recontratable ? ' · Recontratable' : ''}</span>`;
   }
 
-  function insigniaRecontratable(d) {
-    if (d.activo || d.recontratable === null) return '';
-    return d.recontratable
-      ? '<span class="badge badge-plain">Recontratable</span>'
-      : '<span class="badge badge-danger badge-plain">No recontratable</span>';
-  }
-
-  function insigniaIncompleto(d) {
+  function avisoIncompleto(d) {
     if (!d.incompleto.length) return '';
     const falta = d.incompleto.map((k) => FALTANTE[k] || k).join(', ');
-    return `<button type="button" class="badge badge-warning badge-plain" data-accion="incompleto" data-id="${d.id}"
-              title="Falta: ${UI.escape(falta)}. Clic para capturarlo.">Datos incompletos</button>`;
+    return `<button type="button" class="aviso-incompleto" data-accion="incompleto" data-id="${d.id}"
+              title="Falta: ${UI.escape(falta)}. Clic para capturarlo." aria-label="Datos incompletos: falta ${UI.escape(falta)}">${UI.icon('warning')}</button>`;
   }
 
-  // ------------------------------------------------------------------ plantilla
+  // ================================================================== LISTA
   function opcionesFiltro(f) {
     return `<option value="">${UI.escape(f.etiqueta)}</option>` + f.opciones.map(([v, t]) => `<option value="${UI.escape(v)}">${UI.escape(t)}</option>`).join('');
   }
 
-  function plantilla() {
+  function plantillaLista() {
     return `
       <section class="page-header">
         <div>
@@ -139,33 +138,34 @@ const Docentes = (() => {
         </div>
       </section>
 
-      <div class="card">
-        <div class="card-body" style="padding-bottom:4px">
-          <div class="toolbar">
-            <label class="search">
-              <span class="sr-only">Buscar por nombre, CURP, nómina o CRN</span>
-              ${UI.icon('search')}
-              <input class="input" type="search" id="docBuscar" autocomplete="off" placeholder="Nombre, CURP, Nómina o CRN">
-            </label>
-            <label class="check"><input type="checkbox" id="docSemestre">Solo semestre actual</label>
-            <div class="row">
-              <label class="sr-only" for="docOrdenar">Ordenar por</label>
-              <div class="select-wrap"><select class="input select" id="docOrdenar" style="height:34px;font-size:13px">
-                ${ORDENES.map(([v, t]) => `<option value="${v}">Ordenar: ${t}</option>`).join('')}
-              </select></div>
-              <button type="button" class="btn btn-outline btn-icon btn-sm" id="docOrden" aria-label="Cambiar dirección del orden"></button>
-            </div>
-            <div class="dropdown" style="margin-left:auto">
-              <button type="button" class="btn btn-outline btn-sm" id="docColumnasBtn" aria-expanded="false" aria-controls="docColumnas">${UI.icon('columns')}Columnas</button>
-              <div class="dropdown-panel" id="docColumnas" hidden></div>
-            </div>
-          </div>
-          <div class="filtros" id="docFiltros" aria-label="Filtros"></div>
-          <div class="chips" id="docChips" aria-live="polite"></div>
+      <div class="toolbar">
+        <label class="search">
+          <span class="sr-only">Buscar por nombre, CURP, nómina o CRN</span>
+          ${UI.icon('search')}
+          <input class="input" type="search" id="docBuscar" autocomplete="off" placeholder="Nombre, CURP, Nómina o CRN">
+        </label>
+        <label class="check"><input type="checkbox" id="docSemestre">Solo semestre actual</label>
+        <div class="row">
+          <label class="sr-only" for="docOrdenar">Ordenar por</label>
+          <div class="select-wrap"><select class="input select" id="docOrdenar" style="height:34px;font-size:13px">
+            ${ORDENES.map(([v, t]) => `<option value="${v}">Ordenar: ${t}</option>`).join('')}
+          </select></div>
+          <button type="button" class="btn btn-outline btn-icon btn-sm" id="docOrden" aria-label="Cambiar dirección del orden"></button>
         </div>
-        <p class="result-count" id="docConteo" style="padding:0 20px"></p>
-        <div class="table-wrap" style="max-height:70vh">
+        <button type="button" class="btn btn-outline btn-sm" id="docFiltrosBtn" aria-expanded="false" aria-controls="docFiltros">${UI.icon('filter')}Filtros<span class="estado-num" id="docFiltrosNum"></span></button>
+      </div>
+      <div class="filtros" id="docFiltros" aria-label="Filtros" hidden></div>
+      <div class="chips" id="docChips" aria-live="polite"></div>
+
+      <div class="estado-tabs" id="docEstados" role="tablist" aria-label="Estado del docente"></div>
+
+      <div class="card lista-card">
+        <div class="table-wrap" id="docWrap">
           <table class="table docentes-table" id="docTabla" aria-describedby="docConteo"></table>
+        </div>
+        <div class="lista-pie">
+          <p class="small muted" id="docConteo" aria-live="polite"></p>
+          <nav class="paginador" id="docPaginas" aria-label="Páginas"></nav>
         </div>
       </div>`;
   }
@@ -174,13 +174,6 @@ const Docentes = (() => {
     el.querySelector('#docFiltros').innerHTML = FILTROS.map((f) => `
       <div class="select-wrap"><label class="sr-only" for="filtro-${f.clave}">${UI.escape(f.etiqueta)}</label>
         <select class="input select" id="filtro-${f.clave}" data-filtro="${f.clave}">${opcionesFiltro(f)}</select></div>`).join('');
-  }
-
-  function pintarColumnasMenu() {
-    el.querySelector('#docColumnas').innerHTML = `
-      <p class="small muted" style="padding:4px 8px">Columnas visibles</p>
-      ${COLUMNAS.map((c) => `<label class="check"><input type="checkbox" value="${c.clave}" ${estado.columnas.includes(c.clave) ? 'checked' : ''}>${UI.escape(c.etiqueta)}</label>`).join('')}
-      <hr><button type="button" class="btn btn-ghost btn-sm btn-block" data-accion="columnas-defecto">Restablecer columnas</button>`;
   }
 
   function pintarOrden() {
@@ -194,7 +187,15 @@ const Docentes = (() => {
     return (f.opciones.find(([v]) => v === valor) || [valor, valor])[1];
   }
 
+  function pintarBotonFiltros() {
+    const n = Object.values(estado.filtros).reduce((s, v) => s + (Array.isArray(v) ? v.length : 1), 0);
+    el.querySelector('#docFiltrosNum').textContent = n ? ` ${n}` : '';
+    el.querySelector('#docFiltros').hidden = !estado.verFiltros;
+    el.querySelector('#docFiltrosBtn').setAttribute('aria-expanded', String(estado.verFiltros));
+  }
+
   function pintarChips() {
+    pintarBotonFiltros();
     const chips = [];
     if (estado.search) chips.push({ texto: `Búsqueda: "${estado.search}"`, quitar: 'search' });
     if (estado.semestreActual) chips.push({ texto: 'Solo semestre actual', quitar: 'semestre' });
@@ -210,7 +211,51 @@ const Docentes = (() => {
       : '';
   }
 
+  function pintarEstados() {
+    const conteos = estado.datos?.conteos || {};
+    el.querySelector('#docEstados').innerHTML = ESTADOS.map((e) => `
+      <button type="button" role="tab" class="estado-tab ${e.clave === 'incompletos' ? 'tono-pendiente' : ''}" data-estado="${e.clave}"
+              aria-selected="${estado.estado === e.clave}">
+        ${e.icono ? UI.icon(e.icono) : ''}${UI.escape(e.etiqueta)}<span class="estado-num">${conteos[e.conteo] ?? '…'}</span>
+      </button>`).join('');
+  }
+
   // ------------------------------------------------------------------ consulta
+  /**
+   * Filas que caben sin desplazar la página. Con la tabla ya pintada se mide todo lo demás
+   * (encabezados, filtros, pie) y el espacio que queda se divide entre el alto de fila; antes del
+   * primer pintado se estima.
+   */
+  function filasQueCaben() {
+    const wrap = el.querySelector('#docWrap');
+    if (!wrap) return FILAS_MIN;
+    // aire debajo de la tarjeta: el padding inferior del contenedor de vistas (main.content)
+    const MARGEN = (parseFloat(getComputedStyle(el.parentElement).paddingBottom) || 24) + 1;
+    const tbody = el.querySelector('#docTabla tbody');
+    const filas = tbody ? tbody.querySelectorAll('tr.fila-docente').length : 0;
+    let disponible;
+    if (filas) {
+      const finContenido = el.getBoundingClientRect().bottom + window.scrollY;
+      const otros = finContenido - tbody.offsetHeight;
+      disponible = window.innerHeight - otros - MARGEN;
+    } else {
+      const pie = el.querySelector('.lista-pie')?.offsetHeight || 56;
+      const arriba = wrap.getBoundingClientRect().top + window.scrollY;
+      disponible = window.innerHeight - arriba - pie - 44 /* encabezado */ - MARGEN;
+    }
+    return Math.min(FILAS_MAX, Math.max(FILAS_MIN, Math.floor(disponible / ALTO_FILA)));
+  }
+
+  /** Ajusta el tamaño de página conservando visible el primer docente de la página actual. */
+  function ajustarLimite() {
+    const nuevo = filasQueCaben();
+    if (nuevo === estado.limit) return false;
+    const primero = (estado.page - 1) * estado.limit;
+    estado.limit = nuevo;
+    estado.page = Math.floor(primero / nuevo) + 1;
+    return true;
+  }
+
   function query() {
     const p = new URLSearchParams();
     if (estado.search) p.set('search', estado.search);
@@ -226,19 +271,34 @@ const Docentes = (() => {
         p.set(f.clave, Array.isArray(v) ? v.join(',') : v);
       }
     }
+    for (const [k, v] of Object.entries(ESTADOS.find((e) => e.clave === estado.estado).query)) p.set(k, v);
     p.set('ordenar', estado.ordenar);
     p.set('orden', estado.orden);
+    p.set('page', String(estado.page));
+    p.set('limit', String(estado.limit));
     return p.toString();
   }
 
-  async function cargar() {
+  /** Recarga la tabla. `reiniciar` vuelve a la página 1 (cambió búsqueda, filtro u orden). */
+  async function cargar({ reiniciar = false } = {}) {
+    if (reiniciar) estado.page = 1;
     const n = ++estado.peticion;
     pintarChips();
+    ajustarLimite();
     try {
-      const datos = await UI.api(`/docentes?${query()}`);
+      let datos = await UI.api(`/docentes?${query()}`);
       if (n !== estado.peticion || !el.isConnected) return; // llegó una respuesta más nueva
+      if (datos.page > datos.paginas) { // p. ej. se borró el último docente de la última página
+        estado.page = datos.paginas;
+        datos = await UI.api(`/docentes?${query()}`);
+        if (n !== estado.peticion || !el.isConnected) return;
+      }
       estado.datos = datos;
+      recordarLista();
+      pintarEstados();
       pintarTabla();
+      pintarPie();
+      if (ajustarLimite()) cargar(); // los chips o filtros cambiaron el espacio disponible
     } catch (err) {
       if (n !== estado.peticion) return;
       el.querySelector('#docTabla').innerHTML = `<tbody><tr><td><div class="alert alert-error">${UI.escape(err.message)}</div></td></tr></tbody>`;
@@ -246,65 +306,88 @@ const Docentes = (() => {
   }
 
   // ------------------------------------------------------------------ tabla
-  function columnasVisibles() {
-    return COLUMNAS.filter((c) => estado.columnas.includes(c.clave));
-  }
-
-  function encabezado(etiqueta, clave, num = false) {
-    if (!clave) return `<th scope="col" class="${num ? 'num' : ''}">${UI.escape(etiqueta)}</th>`;
+  function encabezado(etiqueta, clave, clase = '') {
+    if (!clave) return `<th scope="col" class="${clase}">${UI.escape(etiqueta)}</th>`;
     const activo = estado.ordenar === clave;
     const sort = activo ? (estado.orden === 'asc' ? 'ascending' : 'descending') : 'none';
     const icono = activo && estado.orden === 'desc' ? 'arrowDown' : 'arrowUp';
-    return `<th scope="col" class="${num ? 'num' : ''}" aria-sort="${sort}"><button type="button" class="th-sort" data-ordenar="${clave}" aria-sort="${sort}">${UI.escape(etiqueta)}${UI.icon(icono)}</button></th>`;
+    return `<th scope="col" class="${clase}" aria-sort="${sort}"><button type="button" class="th-sort" data-ordenar="${clave}" aria-sort="${sort}">${UI.escape(etiqueta)}${UI.icon(icono)}</button></th>`;
   }
 
-  function fila(d, cols) {
-    const expandido = estado.expandido === d.id;
+  function fila(d) {
     return `
-      <tr class="${d.activo ? '' : 'inactivo'} ${expandido ? 'expandido' : ''}" data-id="${d.id}">
-        <td><span class="dot ${d.activo ? 'on' : ''}" role="img" aria-label="${d.activo ? 'Activo' : 'Inactivo'}" title="${d.activo ? 'Activo' : 'Inactivo'}"></span></td>
+      <tr class="fila-docente ${d.activo ? '' : 'inactivo'}" data-fila="${d.id}">
         <td class="col-nombre">
-          <div class="nombre-cell"><div>
-            <button type="button" class="nombre-btn" data-accion="ficha" data-id="${d.id}" aria-expanded="${expandido}">${UI.escape(d.nombre)}</button>
-            <div class="nombre-meta">${insigniaRecontratable(d)}${insigniaIncompleto(d)}</div>
-          </div></div>
+          <div class="nombre-cell">
+            <span class="dot ${d.activo ? 'on' : ''}" role="img" aria-label="${d.activo ? 'Activo' : 'Inactivo'}"></span>
+            <button type="button" class="nombre-btn" data-accion="ficha" data-id="${d.id}">${UI.escape(d.nombre)}</button>
+            ${avisoIncompleto(d)}
+          </div>
         </td>
-        ${cols.map((c) => `<td class="${c.num ? 'num' : ''}">${c.celda(d)}</td>`).join('')}
-      </tr>
-      ${expandido ? `<tr class="ficha-row"><td colspan="${cols.length + 2}"><div class="ficha" id="docFicha"><div class="skeleton" style="height:120px"></div></div></td></tr>` : ''}`;
+        <td class="mono cell-muted">${UI.escape(d.nomina)}</td>
+        <td class="num">${d.numGrupos}</td>
+        <td>${d.antiguedad ? `<span title="Desde ${UI.escape(d.antiguedad.desde)}">${UI.escape(d.antiguedad.texto)}</span>` : '<span class="cell-muted">—</span>'}</td>
+        <td class="num">${valorOpina(d)}</td>
+        <td class="num">${valorFaltas(d.faltas)}</td>
+        <td>${insigniaEstado(d)}</td>
+      </tr>`;
   }
 
   function pintarTabla() {
-    const { docentes, total, periodo, periodoOpina } = estado.datos;
-    const cols = columnasVisibles();
+    const { docentes } = estado.datos;
     const tabla = el.querySelector('#docTabla');
-    el.querySelector('#docConteo').textContent = [
-      `${total} ${total === 1 ? 'docente' : 'docentes'}`,
-      periodo ? `Semestre ${periodo}` : null,
-      periodoOpina ? `OPINA de ${periodoOpina}` : null
-    ].filter(Boolean).join(' · ');
-
     if (!docentes.length) {
-      const hayFiltros = estado.search || estado.semestreActual || Object.keys(estado.filtros).length;
+      const hayFiltros = estado.search || estado.semestreActual || Object.keys(estado.filtros).length || estado.estado !== 'todos';
       tabla.innerHTML = `<tbody><tr><td><div class="empty-state">
         <span class="empty-icon">${UI.icon(hayFiltros ? 'search' : 'users')}</span>
         <h3>${hayFiltros ? 'Ningún docente coincide' : 'Todavía no hay docentes'}</h3>
-        <p class="muted">${hayFiltros ? 'Prueba con otra búsqueda o quita algún filtro.' : 'Sube el Excel de grupos del semestre o captura un docente.'}</p>
+        <p class="muted">${hayFiltros ? 'Prueba con otra búsqueda, otra pestaña o quita algún filtro.' : 'Sube el Excel de grupos del semestre o captura un docente.'}</p>
         ${hayFiltros ? '<button type="button" class="btn btn-outline" data-accion="limpiar">Limpiar filtros</button>' : `<button type="button" class="btn btn-primary" data-accion="grupos">${UI.icon('upload')}Subir Excel de grupos</button>`}
       </div></td></tr></tbody>`;
       return;
     }
     tabla.innerHTML = `
       <thead><tr>
-        <th scope="col"><span class="sr-only">Estatus</span></th>
         ${encabezado('Nombre', 'nombre')}
-        ${cols.map((c) => encabezado(c.etiqueta, c.orden, c.num)).join('')}
+        <th scope="col">Nómina</th>
+        ${encabezado('Grupos', 'grupos', 'num')}
+        ${encabezado('Antigüedad', 'antiguedad')}
+        ${encabezado('OPINA', 'opina', 'num')}
+        <th scope="col" class="num">Faltas</th>
+        <th scope="col">Estado</th>
       </tr></thead>
-      <tbody>${docentes.map((d) => fila(d, cols)).join('')}</tbody>`;
-    if (estado.expandido) {
-      if (docentes.some((d) => d.id === estado.expandido)) cargarFicha(estado.expandido);
-      else estado.expandido = null;
-    }
+      <tbody>${docentes.map(fila).join('')}</tbody>`;
+  }
+
+  /** Números de página con elipsis: 1 … 4 5 6 … 12 */
+  function numerosDePagina(actual, total) {
+    const set = new Set([1, total, actual - 1, actual, actual + 1].filter((p) => p >= 1 && p <= total));
+    const lista = [...set].sort((a, b) => a - b);
+    const salida = [];
+    lista.forEach((p, i) => {
+      if (i && p - lista[i - 1] > 1) salida.push(null);
+      salida.push(p);
+    });
+    return salida;
+  }
+
+  function pintarPie() {
+    const { total, page, limit, paginas, periodo, periodoOpina, docentes } = estado.datos;
+    const desde = total ? (page - 1) * limit + 1 : 0;
+    const hasta = (page - 1) * limit + docentes.length;
+    el.querySelector('#docConteo').textContent = [
+      total ? `Mostrando ${desde}–${hasta} de ${total}` : 'Sin resultados',
+      periodo ? `Semestre ${periodo}` : null,
+      periodoOpina ? `OPINA de ${periodoOpina}` : null
+    ].filter(Boolean).join(' · ');
+    const nav = el.querySelector('#docPaginas');
+    if (paginas <= 1) { nav.innerHTML = ''; return; }
+    nav.innerHTML = `
+      <button type="button" class="pag-btn" data-pagina="${page - 1}" ${page === 1 ? 'disabled' : ''} aria-label="Página anterior">${UI.icon('chevronLeft')}</button>
+      ${numerosDePagina(page, paginas).map((p) => (p === null
+        ? '<span class="pag-gap" aria-hidden="true">…</span>'
+        : `<button type="button" class="pag-btn" data-pagina="${p}" ${p === page ? 'aria-current="page"' : ''} aria-label="Página ${p}">${p}</button>`)).join('')}
+      <button type="button" class="pag-btn" data-pagina="${page + 1}" ${page === paginas ? 'disabled' : ''} aria-label="Página siguiente">${UI.icon('chevronRight')}</button>`;
   }
 
   // ------------------------------------------------------------------ resumen al pasar el mouse (HU-04)
@@ -347,12 +430,7 @@ const Docentes = (() => {
     temporizador = setTimeout(() => mostrarResumen(boton), 350);
   }
 
-  // ------------------------------------------------------------------ ficha extendida (HU-04)
-  const PESTANAS = [
-    ['personales', 'Datos personales'], ['formacion', 'Formación y trayectoria'], ['asignaturas', 'Asignaturas y horarios'],
-    ['faltas', 'Faltas y suplencias'], ['opina', 'OPINA'], ['bajas', 'Historial de bajas']
-  ];
-
+  // ================================================================== FICHA (pantalla completa)
   function dato(etiqueta, valor) {
     return `<div><dt>${UI.escape(etiqueta)}</dt><dd>${valor}</dd></div>`;
   }
@@ -401,40 +479,22 @@ const Docentes = (() => {
         ${dato('Tipo de contrato', UI.guion(d.tipoContrato))}
         ${dato('Antigüedad', d.antiguedad ? UI.escape(d.antiguedad.texto) : '—')}
         ${dato('Primer semestre', UI.guion(d.antiguedad ? d.antiguedad.desde : d.primerSemestreTexto))}
-        ${dato('Cursos (CV)', d.cursos.length ? UI.escape(d.cursos.join(' · ')) : '—')}
         ${dato('Idiomas (CV)', d.idiomas.length ? UI.escape(d.idiomas.join(' · ')) : '—')}
       </dl>
       <p class="section-title">Títulos</p>
-      ${titulos}`;
-  }
-
-  function tabAsignaturas(d) {
-    if (!d.asignaturas.length) return '<p class="muted">No tiene grupos ni actividades en el semestre.</p>';
-    const avisos = (a) => [
-      a.avisos.includes('SIN_CONTRATO') ? '<span class="badge badge-warning badge-plain">Sin contrato</span>' : '',
-      a.avisos.includes('SIN_TARIFA') ? '<span class="badge badge-warning badge-plain">Sin tarifa</span>' : ''
-    ].join(' ');
-    return `
-      <dl class="datos" style="margin-bottom:14px">
-        ${dato('Departamento', UI.guion(d.departamento))}
-        ${dato('Tipo de contrato', UI.guion(d.tipoContrato))}
-        ${dato('Grupos y actividades', String(d.asignaturas.length))}
-        ${dato('Horas por semana', String(d.asignaturas.reduce((s, a) => s + (Number(a.horasSemana) || 0), 0)))}
-      </dl>
-      <div class="table-wrap"><table class="table table-compact">
-        <thead><tr><th>CRN / actividad</th><th>Materia</th><th>Grupo</th><th>Modalidad</th><th>Horario</th><th class="num">h/sem</th>
-          <th>Idioma</th><th>Tipo de clase</th><th class="num">Tarifa (diaria)</th><th class="num">Tarifa (mensual)</th><th>Contrato</th></tr></thead>
-        <tbody>${d.asignaturas.map((a) => `
-          <tr><td class="nowrap">${UI.escape(a.crn || a.nombreActividad || '—')}</td><td>${UI.escape(a.materia || '—')}</td>
-            <td>${UI.guion(a.numeroGrupo)}</td><td>${UI.guion(a.modalidad)}</td><td class="nowrap">${UI.escape(horarioTexto(a.horarios))}</td>
-            <td class="num">${UI.guion(a.horasSemana)}</td><td>${a.idioma === 'EN' ? 'Inglés' : a.idioma === 'ES' ? 'Español' : '—'}</td>
-            <td>${UI.guion(a.tipoClase)}</td><td class="num">${UI.dinero(a.tarifaDiaria)}</td><td class="num">${UI.dinero(a.tarifaMensual)}</td>
-            <td class="nowrap">${a.numContrato ? UI.escape(a.numContrato) : ''} ${avisos(a)}</td></tr>`).join('')}</tbody>
-        <tfoot><tr><td colspan="9" class="num">Total mensual</td><td class="num">${UI.dinero(d.totalMensual)}</td><td></td></tr></tfoot>
-      </table></div>
-      <p class="small muted mt">La tarifa mensual es el pago al semestre entre 4.</p>
-      <p class="section-title mt">Vista semanal</p>
-      ${vistaSemanal(d.asignaturas)}`;
+      ${titulos}
+      <p class="section-title mt">Cursos y certificados (CV)</p>
+      ${d.cursos.length
+        ? `<ul class="lista-cv">${d.cursos.map((c) => `<li>${UI.escape(c)}</li>`).join('')}</ul>`
+        : '<p class="muted">Sin cursos leídos del CV.</p>'}
+      <p class="section-title mt">Experiencia (CV)</p>
+      ${(d.experiencia || []).length
+        ? `<ul class="lista-cv">${d.experiencia.map((x) => `<li>
+            <strong>${UI.escape(x.cargo || (x.asignaturas && x.asignaturas.length ? 'Docente' : 'Puesto sin nombre'))}</strong>${x.institucion ? ` · ${UI.escape(x.institucion)}` : ''}
+            ${x.periodo ? `<span class="muted"> · ${UI.escape(x.periodo)}</span>` : ''}
+            ${x.vigente ? ' <span class="badge badge-success badge-plain" title="El CV dice “a la fecha”: sigue trabajando ahí">Actual</span>' : ''}
+            ${x.asignaturas && x.asignaturas.length ? `<div class="small muted">${UI.escape(x.asignaturas.join(' · '))}</div>` : ''}</li>`).join('')}</ul>`
+        : '<p class="muted">Sin experiencia leída del CV.</p>'}`;
   }
 
   // ------------------------------------------------------------------ vista semanal (HU-19)
@@ -504,17 +564,6 @@ const Docentes = (() => {
     return `<p class="section-title">Faltas y descuentos</p>${faltas}<p class="section-title mt">Suplencias que cubrió</p>${sup}`;
   }
 
-  function tabOpina(d) {
-    if (!d.opinaPeriodos.length) return '<p class="muted">Sin respuestas de OPINA.</p>';
-    return d.opinaPeriodos.map((p) => `
-      <div class="repeat-item">
-        <div class="repeat-head"><span>${UI.escape(p.periodo)}</span>
-          <span>${UI.porcentaje(p.porcentaje)} · ${p.respuestas} respuestas</span></div>
-        <table class="table table-compact"><thead><tr><th>CRN</th><th>Materia</th><th class="num">Respuestas</th><th class="num">% recomendación</th></tr></thead>
-          <tbody>${p.porCrn.map((c) => `<tr><td>${UI.escape(c.crn)}</td><td>${UI.guion(c.materia)}</td><td class="num">${c.respuestas}</td><td class="num">${UI.porcentaje(c.porcentaje)}</td></tr>`).join('')}</tbody></table>
-      </div>`).join('');
-  }
-
   function tabBajas(d) {
     if (!d.bajas.length) return '<p class="muted">Nunca se ha dado de baja.</p>';
     return `<div class="table-wrap"><table class="table table-compact">
@@ -526,60 +575,172 @@ const Docentes = (() => {
       <p class="small muted mt">Las observaciones solo se ven aquí.</p>`;
   }
 
+  function tabAsignaturas(d) {
+    if (!d.asignaturas.length) return '<p class="muted">No tiene grupos ni actividades en el semestre.</p>';
+    const tarjeta = (a) => {
+      const avisos = [
+        a.avisos.includes('SIN_CONTRATO') ? '<span class="badge badge-warning">Sin contrato</span>' : '',
+        a.avisos.includes('SIN_TARIFA') ? '<span class="badge badge-warning">Sin tarifa</span>' : ''
+      ].join('');
+      const sub = [a.crn ? `CRN ${a.crn}` : 'Actividad', a.numeroGrupo ? `Grupo ${a.numeroGrupo}` : null,
+        a.horarios && a.horarios.length ? horarioTexto(a.horarios) : null, a.modalidad].filter(Boolean).join(' · ');
+      return `
+        <article class="materia-card">
+          <header class="materia-head">
+            <div><h4>${UI.escape(a.materia || a.nombreActividad || '—')}</h4><p class="small muted">${UI.escape(sub)}</p></div>
+            <div class="row">${avisos}</div>
+          </header>
+          <dl class="materia-datos">
+            <div><dt>Idioma</dt><dd>${a.idioma === 'EN' ? 'Inglés' : a.idioma === 'ES' ? 'Español' : '—'}</dd></div>
+            <div><dt>Tipo de clase</dt><dd>${UI.guion(a.tipoClase)}</dd></div>
+            <div><dt>Horas / semana</dt><dd>${UI.guion(a.horasSemana)}</dd></div>
+            <div><dt>Tarifa diaria</dt><dd>${UI.dinero(a.tarifaDiaria)}</dd></div>
+            <div><dt>Tarifa mensual</dt><dd>${UI.dinero(a.tarifaMensual)}</dd></div>
+            <div><dt>Contrato</dt><dd>${a.numContrato ? UI.escape(a.numContrato) : '<span class="cell-muted">—</span>'}</dd></div>
+          </dl>
+        </article>`;
+    };
+    return `
+      <div class="seccion-head">
+        <p class="section-title">${d.asignaturas.length} ${d.asignaturas.length === 1 ? 'grupo o actividad' : 'grupos y actividades'}${d.departamento ? ` · ${UI.escape(d.departamento)}` : ''}</p>
+        <p class="small muted">Total mensual <strong>${UI.dinero(d.totalMensual)}</strong> · la tarifa mensual es el pago al semestre entre 4</p>
+      </div>
+      <div class="materias">${d.asignaturas.map(tarjeta).join('')}</div>
+      <p class="section-title mt">Vista semanal</p>
+      ${vistaSemanal(d.asignaturas)}`;
+  }
+
+  // ------------------------------------------------------------------ pestaña OPINA (GET /docentes/:id/opina)
+  function barra(etiqueta, pct, detalle) {
+    return `<div class="barra-fila"><span>${UI.escape(etiqueta)}</span>
+      <div class="barra" role="img" aria-label="${UI.escape(etiqueta)}: ${pct} %"><span class="barra-relleno tono-${tonoOpina(pct)}" style="width:${Math.max(0, Math.min(100, pct))}%"></span></div>
+      <strong>${UI.porcentaje(pct)}</strong><span class="small muted">${UI.escape(detalle || '')}</span></div>`;
+  }
+
+  function tabOpina(d) {
+    const clave = `${d.id}|${estado.opinaPeriodo || ''}`;
+    const r = cacheOpina.get(clave);
+    if (!r) {
+      UI.api(`/docentes/${d.id}/opina${estado.opinaPeriodo ? `?periodoId=${estado.opinaPeriodo}` : ''}`)
+        .then((res) => { cacheOpina.set(clave, res); if (estado.vista === 'ficha' && estado.pestana === 'opina') pintarPanel(); })
+        .catch((err) => { const p = el.querySelector('#panel-ficha'); if (p) p.innerHTML = `<div class="alert alert-error">${UI.escape(err.message)}</div>`; });
+      return '<div class="skeleton" style="height:160px"></div>';
+    }
+    if (!r.periodos.length) return '<p class="muted">Sin respuestas de OPINA.</p>';
+    const selector = `
+      <div class="select-wrap" style="max-width:240px"><label class="sr-only" for="opinaPeriodo">Semestre</label>
+        <select class="input select" id="opinaPeriodo">${r.periodos.map((p) => `<option value="${p.id}" ${r.periodo && p.id === r.periodo.id ? 'selected' : ''}>${UI.escape(p.clave)} · ${UI.porcentaje(p.porcentaje)}</option>`).join('')}</select></div>`;
+    if (!r.global) return `${selector}<p class="muted mt">Sin respuestas en ese semestre.</p>`;
+    const g = r.global;
+    return `
+      <div class="seccion-head">${selector}
+        <p class="small muted">Calificación global = Σ "Sí" ÷ Σ respuestas de todos sus grupos${g.muestraSuficiente ? '' : ` · <strong>muestra insuficiente</strong> (menos de ${r.muestraMinima})`}</p></div>
+      <div class="kpis-mini">
+        <div><span class="kpi-label">Calificación global</span><strong class="valor-tono ${g.muestraSuficiente ? tonoOpina(g.porcentaje) : 'neutro'}">${UI.porcentaje(g.porcentaje)}</strong></div>
+        <div><span class="kpi-label">Respuestas</span><strong>${g.respuestas}</strong></div>
+        <div><span class="kpi-label">Recomiendan</span><strong>${g.positivas}</strong></div>
+      </div>
+      <p class="section-title mt">Por grupo</p>
+      <div class="barras">${r.porCrn.map((c) => barra(`${c.crn} · ${c.materia || ''}${c.grupo ? ` · ${c.grupo}` : ''}`, c.porcentaje, `${c.respuestas} resp.`)).join('')}</div>
+      ${r.reactivos ? `<p class="section-title mt">Reactivos (% de "Sí")</p>
+        <div class="barras">${r.reactivos.map((x) => barra(x.etiqueta, x.porcentajeSi, x.noSeguro ? `${x.noSeguro} no seguro(s)` : '')).join('')}</div>` : ''}
+      ${r.razones.porQueSi.length || r.razones.porQueNo.length ? `<p class="section-title mt">Razones</p>
+        <div class="razones">
+          <div><p class="small muted">¿Por qué sí?</p><ul>${r.razones.porQueSi.map((x) => `<li>${UI.escape(x.razon)} <span class="muted">(${x.alumnos})</span></li>`).join('') || '<li class="muted">—</li>'}</ul></div>
+          <div><p class="small muted">¿Por qué no?</p><ul>${r.razones.porQueNo.map((x) => `<li>${UI.escape(x.razon)} <span class="muted">(${x.alumnos})</span></li>`).join('') || '<li class="muted">—</li>'}</ul></div>
+        </div>` : ''}
+      <p class="section-title mt">Comentarios de alumnos <span class="badge badge-outline badge-plain">Confidencial</span></p>
+      ${r.comentarios.length
+        ? `<ul class="comentarios">${r.comentarios.map((c) => `<li class="${c.recomienda ? '' : 'negativo'}"><span class="small muted">${UI.escape(c.crn)} · ${c.recomienda ? 'Recomienda' : 'No recomienda'}</span><p>${UI.escape(c.texto)}</p></li>`).join('')}</ul>`
+        : '<p class="muted">Sin comentarios.</p>'}`;
+  }
+
   const CONTENIDO = { personales: tabPersonales, formacion: tabFormacion, asignaturas: tabAsignaturas, faltas: tabFaltas, opina: tabOpina, bajas: tabBajas };
 
-  function pintarFicha(d) {
-    const box = el.querySelector('#docFicha');
-    if (!box) return;
-    box.innerHTML = `
-      <div class="ficha-head">
-        <span class="dot ${d.activo ? 'on' : ''}" aria-hidden="true"></span>
-        <h3>${UI.escape(d.nombre)}</h3>
-        <span class="muted">${UI.escape(d.nomina)}</span>
-        ${insigniaRecontratable(d)}
-        <div class="row">
-          <button type="button" class="btn btn-outline btn-sm" data-accion="editar" data-id="${d.id}">${UI.icon('pencil')}Editar</button>
-          ${d.cv.disponible
-            ? `<a class="btn btn-outline btn-sm" href="/api/docentes/${d.id}/cv" target="_blank" rel="noopener">${UI.icon('file')}Ver CV</a>`
-            : `<button type="button" class="btn btn-outline btn-sm" disabled title="Sin CV cargado">${UI.icon('file')}Ver CV</button>`}
-          ${d.activo
-            ? `<button type="button" class="btn btn-outline btn-sm btn-danger-ghost" data-accion="baja" data-id="${d.id}">${UI.icon('userX')}Suspender</button>`
-            : `<button type="button" class="btn btn-outline btn-sm" data-accion="reactivar" data-id="${d.id}">${UI.icon('userCheck')}Reactivar</button>`}
-          <button type="button" class="btn btn-ghost btn-icon btn-sm" data-accion="cerrar-ficha" aria-label="Cerrar ficha">${UI.icon('x')}</button>
+  function kpi(etiqueta, valor, tono = '', nota = '') {
+    return `<div class="perfil-kpi"><span class="kpi-label">${UI.escape(etiqueta)}</span><strong class="${tono ? `valor-tono ${tono}` : ''}">${valor}</strong>${nota ? `<span class="small muted">${nota}</span>` : ''}</div>`;
+  }
+
+  function lineaAviso(d) {
+    if (!d.activo && d.bajas.length) {
+      const b = d.bajas[0];
+      return `<p class="perfil-aviso tono-neutro">${UI.icon('userX')}Dado de baja el ${UI.escape(UI.fecha(b.fecha))} · ${UI.escape(b.motivo)} · ${b.recontratable ? 'Recontratable' : 'No recontratable'}</p>`;
+    }
+    if (d.incompleto.length) {
+      return `<p class="perfil-aviso tono-pendiente">${UI.icon('warning')}Faltan datos: ${UI.escape(d.incompleto.map((k) => FALTANTE[k] || k).join(', '))}
+        <button type="button" class="link-btn" data-accion="incompleto" data-id="${d.id}">Completar</button></p>`;
+    }
+    return '';
+  }
+
+  function plantillaFicha(d) {
+    const horas = d.asignaturas.reduce((s, a) => s + (Number(a.horasSemana) || 0), 0);
+    const meta = [d.nomina, d.nivelImparte, d.departamento, d.campoFormacion].filter(Boolean).map(UI.escape).join(' · ');
+    const opina = d.opina
+      ? kpi('OPINA', `${UI.porcentaje(d.opina.porcentaje)}${d.opina.muestraInsuficiente ? '*' : ''}`, d.opina.muestraInsuficiente ? 'neutro' : tonoOpina(d.opina.porcentaje))
+      : kpi('OPINA', '—');
+    return `
+      <button type="button" class="volver" data-accion="volver">${UI.icon('chevronLeft')}Volver a docentes</button>
+
+      <section class="card perfil-card">
+        <div class="perfil-head">
+          <span class="avatar-lg ${d.activo ? '' : 'inactivo'}" aria-hidden="true">${UI.escape(UI.initials(`${d.nombres || ''} ${d.apellidoPaterno || ''}`))}</span>
+          <div class="perfil-info">
+            <h2>${UI.escape(d.nombre)}</h2>
+            <p class="muted">${meta}</p>
+            ${lineaAviso(d)}
+          </div>
+          <div class="perfil-acciones">
+            ${insigniaEstado(d)}
+            <div class="row">
+              <button type="button" class="btn btn-outline btn-sm" data-accion="editar" data-id="${d.id}">${UI.icon('pencil')}Editar</button>
+              ${d.cv.disponible
+                ? `<a class="btn btn-outline btn-sm" href="/api/docentes/${d.id}/cv" target="_blank" rel="noopener">${UI.icon('file')}Ver CV</a>`
+                : `<button type="button" class="btn btn-outline btn-sm" disabled title="Sin CV cargado">${UI.icon('file')}Ver CV</button>`}
+              ${d.activo
+                ? `<button type="button" class="btn btn-outline btn-sm btn-danger-ghost" data-accion="baja" data-id="${d.id}">${UI.icon('userX')}Suspender</button>`
+                : `<button type="button" class="btn btn-outline btn-sm" data-accion="reactivar" data-id="${d.id}">${UI.icon('userCheck')}Reactivar</button>`}
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="tabs" role="tablist">
+        <div class="perfil-kpis">
+          ${opina}
+          ${kpi('Faltas del semestre', String(d.faltas), tonoFaltas(d.faltas))}
+          ${kpi('Grupos', String(d.numGrupos))}
+          ${kpi('Horas / semana', String(horas))}
+          ${d.antiguedad
+            ? kpi('Antigüedad', `${d.antiguedad.anios} ${d.antiguedad.anios === 1 ? 'año' : 'años'}`, '', `${d.antiguedad.semestres} semestres · desde ${UI.escape(d.antiguedad.desde)}`)
+            : kpi('Antigüedad', '—')}
+          ${kpi('Total mensual', UI.dinero(d.totalMensual))}
+        </div>
+      </section>
+
+      <div class="tabs perfil-tabs" role="tablist">
         ${PESTANAS.map(([k, t]) => `<button type="button" class="tab" role="tab" id="tab-${k}" aria-controls="panel-ficha" aria-selected="${estado.pestana === k}" data-pestana="${k}">${t}${k === 'bajas' && d.bajas.length ? ` (${d.bajas.length})` : ''}</button>`).join('')}
       </div>
-      <div id="panel-ficha" role="tabpanel" aria-labelledby="tab-${estado.pestana}">${CONTENIDO[estado.pestana](d)}</div>`;
-    box._docente = d;
-    ajustarFicha();
+      <section class="card"><div class="card-body" id="panel-ficha" role="tabpanel" aria-labelledby="tab-${estado.pestana}"></div></section>`;
   }
 
-  /** La ficha vive dentro de la tabla ancha: se fija al ancho visible para no tener que desplazarse. */
-  function ajustarFicha() {
-    const box = el && el.querySelector('#docFicha');
-    const wrap = el && el.querySelector('.table-wrap');
-    if (box && wrap) box.style.width = `${wrap.clientWidth}px`;
+  function pintarPanel() {
+    const panel = el.querySelector('#panel-ficha');
+    if (!panel || !estado.docente) return;
+    el.querySelectorAll('[data-pestana]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.pestana === estado.pestana)));
+    panel.setAttribute('aria-labelledby', `tab-${estado.pestana}`);
+    panel.innerHTML = CONTENIDO[estado.pestana](estado.docente);
   }
 
-  async function cargarFicha(id) {
+  async function cargarFicha() {
     try {
-      const { docente } = await UI.api(`/docentes/${id}`);
-      if (estado.expandido === id) pintarFicha(docente);
+      const { docente } = await UI.api(`/docentes/${estado.id}`);
+      if (!el.isConnected || estado.vista !== 'ficha') return;
+      estado.docente = docente;
+      document.title = `${docente.nombre} · SIDI`;
+      el.innerHTML = plantillaFicha(docente);
+      pintarPanel();
     } catch (err) {
-      const box = el.querySelector('#docFicha');
-      if (box) box.innerHTML = `<div class="alert alert-error">${UI.escape(err.message)}</div>`;
-    }
-  }
-
-  function alternarFicha(id, pestana) {
-    estado.expandido = estado.expandido === id && !pestana ? null : id;
-    if (pestana) estado.pestana = pestana;
-    pintarTabla();
-    if (estado.expandido) {
-      const filaEl = el.querySelector(`tr[data-id="${id}"]`);
-      if (filaEl) filaEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      el.innerHTML = `
+        <button type="button" class="volver" data-accion="volver">${UI.icon('chevronLeft')}Volver a docentes</button>
+        <div class="alert alert-error">${UI.escape(err.message)}</div>`;
     }
   }
 
@@ -685,23 +846,34 @@ const Docentes = (() => {
     return true;
   }
 
-  // ------------------------------------------------------------------ eventos
+  // ------------------------------------------------------------------ navegación
+  function irAFicha(id, pestana) {
+    memoria.desdeLista = estado && estado.vista === 'lista';
+    recordarLista();
+    ocultarResumen();
+    location.hash = `docentes?ficha=${id}${pestana ? `&pestana=${pestana}` : ''}`;
+  }
+
+  function volver() {
+    if (memoria.desdeLista) { memoria.desdeLista = false; history.back(); }
+    else location.hash = 'docentes';
+  }
+
   function docentePorId(id) {
-    const box = el.querySelector('#docFicha');
-    if (box && box._docente && box._docente.id === id) return box._docente;
-    return estado.datos.docentes.find((d) => d.id === id);
+    if (estado.vista === 'ficha' && estado.docente && estado.docente.id === id) return estado.docente;
+    return estado.datos?.docentes.find((d) => d.id === id);
   }
 
-  async function despues(promesa, recargarFicha = true) {
-    if (await promesa) {
-      cacheResumen.clear();
-      await cargar();
-      if (recargarFicha && estado.expandido) cargarFicha(estado.expandido);
-    }
+  /** Después de editar, dar de baja o importar: recarga lo que se está viendo. */
+  async function despues(promesa) {
+    if (!(await promesa)) return;
+    cacheResumen.clear();
+    cacheOpina.clear();
+    if (estado.vista === 'ficha') cargarFicha();
+    else cargar();
   }
 
-  const PASO_FALTANTE = { curp: 'personales', campoFormacion: 'formacion', primerSemestre: 'formacion', contrato: 'asignaturas' };
-
+  // ------------------------------------------------------------------ eventos
   function alClic(e) {
     const quitar = e.target.closest('[data-quitar]');
     if (quitar) { quitarChip(quitar.dataset.quitar); return; }
@@ -711,46 +883,52 @@ const Docentes = (() => {
       estado.orden = estado.ordenar === clave && estado.orden === 'asc' ? 'desc' : 'asc';
       estado.ordenar = clave;
       pintarOrden();
-      cargar();
+      cargar({ reiniciar: true });
       return;
     }
+    const pagina = e.target.closest('[data-pagina]');
+    if (pagina) {
+      if (pagina.disabled) return;
+      estado.page = Number(pagina.dataset.pagina);
+      cargar();
+      el.querySelector('#docEstados')?.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    const est = e.target.closest('[data-estado]');
+    if (est) { estado.estado = est.dataset.estado; cargar({ reiniciar: true }); return; }
     const tab = e.target.closest('[data-pestana]');
     if (tab) {
       estado.pestana = tab.dataset.pestana;
-      const box = el.querySelector('#docFicha');
-      if (box && box._docente) pintarFicha(box._docente);
+      history.replaceState(null, '', `#docentes?ficha=${estado.id}&pestana=${estado.pestana}`);
+      pintarPanel();
       el.querySelector(`#tab-${estado.pestana}`)?.focus();
       return;
     }
     const b = e.target.closest('[data-accion]');
     if (!b) {
-      if (!e.target.closest('.dropdown')) cerrarColumnas();
+      // Clic en cualquier parte de la fila abre la ficha
+      const filaEl = e.target.closest('[data-fila]');
+      if (filaEl && !e.target.closest('a, button, input, select')) irAFicha(Number(filaEl.dataset.fila));
       return;
     }
     const id = Number(b.dataset.id);
     switch (b.dataset.accion) {
-      case 'ficha': ocultarResumen(); alternarFicha(id); break;
-      case 'cerrar-ficha': estado.expandido = null; pintarTabla(); break;
-      case 'nuevo': despues(DocenteForm.nuevo(), false); break;
-      case 'rapida': despues(DocenteForm.altaRapida(), false); break;
+      case 'ficha': irAFicha(id); break;
+      case 'volver': volver(); break;
+      case 'nuevo': despues(DocenteForm.nuevo()); break;
+      case 'rapida': despues(DocenteForm.altaRapida()); break;
       case 'editar': despues(DocenteForm.editar(id)); break;
       case 'capturar': despues(DocenteForm.editar(id, { paso: b.dataset.paso })); break;
       case 'incompleto': {
         const d = docentePorId(id);
-        despues(DocenteForm.editar(id, { paso: PASO_FALTANTE[d.incompleto[0]] || 'personales' }));
+        despues(DocenteForm.editar(id, { paso: PASO_FALTANTE[d?.incompleto[0]] || 'personales' }));
         break;
       }
-      case 'grupos': despues(Importar.grupos(), false); break;
-      case 'cv': despues(Importar.cv(), false); break;
+      case 'grupos': despues(Importar.grupos()); break;
+      case 'cv': despues(Importar.cv()); break;
       case 'baja': despues(darDeBaja(docentePorId(id))); break;
       case 'reactivar': despues(reactivar(docentePorId(id))); break;
       case 'limpiar': limpiar(); break;
-      case 'columnas-defecto':
-        estado.columnas = COLUMNAS.filter((c) => c.defecto).map((c) => c.clave);
-        UI.store.set(KEY_COLUMNAS, estado.columnas);
-        pintarColumnasMenu();
-        pintarTabla();
-        break;
       default: break;
     }
   }
@@ -766,34 +944,32 @@ const Docentes = (() => {
         if (resto.length) estado.filtros[f] = resto; else delete estado.filtros[f];
       } else delete estado.filtros[f];
     }
-    cargar();
+    cargar({ reiniciar: true });
   }
 
   function limpiar() {
     estado.search = '';
     estado.semestreActual = false;
     estado.filtros = {};
+    estado.estado = 'todos';
     el.querySelector('#docBuscar').value = '';
     el.querySelector('#docSemestre').checked = false;
     App.sincronizarBusqueda('');
-    cargar();
+    cargar({ reiniciar: true });
   }
 
-  function cerrarColumnas() {
-    const panel = el.querySelector('#docColumnas');
-    if (panel && !panel.hidden) {
-      panel.hidden = true;
-      el.querySelector('#docColumnasBtn').setAttribute('aria-expanded', 'false');
-    }
-  }
-
-  function enlazar() {
-    el.addEventListener('click', alClic);
-    const buscar = UI.debounce((q) => { estado.search = q; App.sincronizarBusqueda(q); cargar(); }, 250);
+  function enlazarLista() {
+    const buscar = UI.debounce((q) => { estado.search = q; App.sincronizarBusqueda(q); cargar({ reiniciar: true }); }, 250);
     el.querySelector('#docBuscar').addEventListener('input', (e) => buscar(e.target.value.trim()));
-    el.querySelector('#docSemestre').addEventListener('change', (e) => { estado.semestreActual = e.target.checked; cargar(); });
-    el.querySelector('#docOrdenar').addEventListener('change', (e) => { estado.ordenar = e.target.value; pintarOrden(); cargar(); });
-    el.querySelector('#docOrden').addEventListener('click', () => { estado.orden = estado.orden === 'asc' ? 'desc' : 'asc'; pintarOrden(); cargar(); });
+    el.querySelector('#docSemestre').addEventListener('change', (e) => { estado.semestreActual = e.target.checked; cargar({ reiniciar: true }); });
+    el.querySelector('#docOrdenar').addEventListener('change', (e) => { estado.ordenar = e.target.value; pintarOrden(); cargar({ reiniciar: true }); });
+    el.querySelector('#docOrden').addEventListener('click', () => { estado.orden = estado.orden === 'asc' ? 'desc' : 'asc'; pintarOrden(); cargar({ reiniciar: true }); });
+    el.querySelector('#docFiltrosBtn').addEventListener('click', () => {
+      estado.verFiltros = !estado.verFiltros;
+      pintarBotonFiltros();
+      recordarLista();
+      if (ajustarLimite()) cargar(); // mostrar u ocultar filtros cambia cuántas filas caben
+    });
     el.querySelector('#docFiltros').addEventListener('change', (e) => {
       const s = e.target.closest('[data-filtro]');
       if (!s || !s.value) return;
@@ -805,20 +981,7 @@ const Docentes = (() => {
         estado.filtros[f.clave] = s.value;
       }
       s.value = '';
-      cargar();
-    });
-    const btnCols = el.querySelector('#docColumnasBtn');
-    btnCols.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const panel = el.querySelector('#docColumnas');
-      panel.hidden = !panel.hidden;
-      btnCols.setAttribute('aria-expanded', String(!panel.hidden));
-    });
-    el.querySelector('#docColumnas').addEventListener('change', (e) => {
-      if (e.target.type !== 'checkbox') return;
-      estado.columnas = COLUMNAS.map((c) => c.clave).filter((k) => (k === e.target.value ? e.target.checked : estado.columnas.includes(k)));
-      UI.store.set(KEY_COLUMNAS, estado.columnas);
-      pintarTabla();
+      cargar({ reiniciar: true });
     });
     // Resumen al pasar el mouse o al enfocar el nombre (HU-04)
     const tabla = el.querySelector('#docTabla');
@@ -826,15 +989,24 @@ const Docentes = (() => {
     tabla.addEventListener('mouseout', (e) => { if (e.target.closest('.nombre-btn')) ocultarResumen(); });
     tabla.addEventListener('focusin', (e) => { const b = e.target.closest('.nombre-btn'); if (b) programarResumen(b); });
     tabla.addEventListener('focusout', (e) => { if (e.target.closest('.nombre-btn')) ocultarResumen(); });
-    el.querySelector('.table-wrap').addEventListener('scroll', ocultarResumen, { passive: true });
     window.addEventListener('hashchange', ocultarResumen, { once: true });
   }
 
-  window.addEventListener('resize', UI.debounce(() => ajustarFicha(), 150));
+  // Al cambiar el tamaño de la ventana se recalculan las filas por página (se registra una sola vez).
+  window.addEventListener('resize', UI.debounce(() => {
+    if (el && el.isConnected && estado && estado.vista === 'lista' && estado.datos && ajustarLimite()) cargar();
+  }, 200));
 
-  // Escape cierra el resumen y el menú de columnas (se registra una sola vez).
+  // Escape cierra el resumen (se registra una sola vez).
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && el && el.isConnected) { ocultarResumen(); cerrarColumnas(); }
+    if (e.key === 'Escape' && el && el.isConnected) ocultarResumen();
+  });
+
+  // Cambio de semestre en la pestaña OPINA de la ficha
+  document.addEventListener('change', (e) => {
+    if (e.target.id !== 'opinaPeriodo' || !el || !el.contains(e.target)) return;
+    estado.opinaPeriodo = Number(e.target.value);
+    pintarPanel();
   });
 
   async function cargarCatalogos() {
@@ -845,35 +1017,57 @@ const Docentes = (() => {
         f.opciones = [...catalogos.map((c) => [c.valor, c.valor]), ['ninguno', 'Sin dato']];
       } catch { f.opciones = [['ninguno', 'Sin dato']]; }
     }));
-    if (el.isConnected) pintarFiltros();
+    if (el.isConnected && estado.vista === 'lista') pintarFiltros();
+  }
+
+  function montarLista(parametros) {
+    estado = { vista: 'lista', ...estadoLista(parametros) };
+    el.innerHTML = plantillaLista();
+    el.querySelector('#docBuscar').value = estado.search;
+    el.querySelector('#docSemestre').checked = estado.semestreActual;
+    pintarFiltros();
+    pintarOrden();
+    pintarEstados();
+    enlazarLista();
+    cargarCatalogos();
+    cargar();
+  }
+
+  function montarFicha(parametros) {
+    estado = {
+      vista: 'ficha',
+      id: Number(parametros.ficha),
+      pestana: PESTANAS.some(([k]) => k === parametros.pestana) ? parametros.pestana : 'asignaturas',
+      opinaPeriodo: null,
+      docente: null
+    };
+    el.innerHTML = '<div class="skeleton" style="height:220px"></div>';
+    cargarFicha();
   }
 
   function mount(container, parametros = {}) {
-    el = container;
-    estado = estadoInicial(parametros);
+    // Raíz propia en cada montaje: sus listeners desaparecen cuando App monta otra vista en #view
+    el = document.createElement('div');
+    el.className = 'docentes-vista';
+    container.appendChild(el);
+    el.addEventListener('click', alClic);
     cacheResumen.clear();
-    container.innerHTML = plantilla();
-    el.querySelector('#docBuscar').value = estado.search;
-    pintarFiltros();
-    pintarColumnasMenu();
-    pintarOrden();
-    enlazar();
-    cargarCatalogos();
-    cargar();
+    if (Number(parametros.ficha) > 0) montarFicha(parametros);
+    else montarLista(parametros);
   }
 
   /** La barra superior escribe aquí cuando ya estamos en Docentes. */
   function buscar(q) {
     if (!el || !el.isConnected) return;
+    if (estado.vista !== 'lista') { memoria.lista = { ...(memoria.lista || {}), search: q, page: 1 }; location.hash = `docentes?search=${encodeURIComponent(q)}`; return; }
     estado.search = q;
     el.querySelector('#docBuscar').value = q;
-    cargar();
+    cargar({ reiniciar: true });
   }
 
   /** Abre la ficha de un docente (otras vistas, p. ej. el ranking de OPINA). */
   function abrir(id, pestana) {
-    if (!el || !el.isConnected) return;
-    alternarFicha(id, pestana || 'personales');
+    irAFicha(id, pestana);
   }
 
   return { mount, buscar, abrir, horarioTexto, DIAS };

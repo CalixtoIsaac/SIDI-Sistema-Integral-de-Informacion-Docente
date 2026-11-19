@@ -248,6 +248,7 @@ const Comun = (() => {
     MONTO_EDITADO: 'Monto editado a mano',
     MONTO_CERO: 'Monto en $0.00',
     SUPLENTE_SIN_CONTRATO: 'Suplencia sin contrato del suplente',
+    CONTRATO_NO_ES_DEL_SUPLENTE: 'El contrato guardado ya no es del suplente (al generar se usa el vigente)',
     SUPLENTE_INACTIVO: 'El suplente está inactivo',
     SUPLENTE_NO_RECONTRATABLE: 'El suplente es "No recontratable"',
     NO_RECONTRATABLE: 'No recontratable',

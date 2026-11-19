@@ -5,6 +5,7 @@
  *  POST   /api/faltas/preview   → calcula sin guardar: { filas, totales, sinContrato, sinTarifa, repetidas, segundaSesion }
  *  POST   /api/faltas           → 201 { faltas, totales }  (una por CRN, día y sesión; transacción)
  *  GET    /api/faltas/resumen-semestral?periodoId= → indicadores y desgloses del semestre (HU-14)
+ *  GET    /api/faltas/resumen-quincena?quincenaId= → descontado, pagado a suplentes y diferencia por docente (= hoja detalle)
  *  POST   /api/faltas/disponibles → { gruposASuplir, avisos }  grupos a suplir y docentes disponibles (HU-22)
  *  GET    /api/faltas/:id       → { falta }
  *  PUT    /api/faltas/:id       → { falta }  recalcula monto y textos · 423 si la quincena está cerrada
@@ -18,6 +19,7 @@ const db = require('../lib/db');
 const faltasService = require('../services/faltasService');
 const disponiblesService = require('../services/disponiblesService');
 const inasistenciasService = require('../services/inasistenciasService');
+const resumenQuincenaService = require('../services/resumenQuincenaService');
 const { HttpError, manejarErrores } = require('../lib/errores');
 
 const router = express.Router();
@@ -31,6 +33,7 @@ router.param('id', (req, res, next, valor) => {
 
 router.get('/', (req, res) => res.json(faltasService.listar(db, req.query)));
 router.get('/resumen-semestral', (req, res) => res.json(inasistenciasService.resumenSemestral(db, req.query)));
+router.get('/resumen-quincena', (req, res) => res.json(resumenQuincenaService.resumenQuincena(db, req.query)));
 router.post('/disponibles', (req, res) => res.json(disponiblesService.disponibles(db, req.body ?? {})));
 router.post('/preview', (req, res) => res.json(faltasService.preview(db, req.body ?? {})));
 router.post('/', (req, res) => res.status(201).json(faltasService.crear(db, req.body ?? {})));
