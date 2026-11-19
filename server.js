@@ -40,6 +40,7 @@ app.use('/api/titulos', require('./routes/titulos'));
 app.use('/api/asignaturas', require('./routes/asignaturas'));
 app.use('/api/tipos-clase', require('./routes/catalogos').tiposClase);
 app.use('/api/catalogos', require('./routes/catalogos').catalogos);
+app.use('/api/departamentos', require('./routes/departamentos'));
 app.use('/api/contratos', require('./routes/contratos'));
 app.use('/api/faltas', require('./routes/faltas'));
 app.use('/api/periodos', require('./routes/periodos'));

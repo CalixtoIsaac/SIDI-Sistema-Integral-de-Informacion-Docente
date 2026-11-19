@@ -29,13 +29,13 @@
       </div>
 
       <nav class="sidebar-nav">
-        <a class="nav-link" href="#panel" data-view="panel"><span data-icon="chart"></span>Panel</a>
-        <a class="nav-link" href="#docentes" data-view="docentes"><span data-icon="users"></span>Docentes</a>
-        <a class="nav-link" href="#faltas" data-view="faltas"><span data-icon="calendar"></span>Faltas</a>
-        <a class="nav-link" href="#incidencias" data-view="incidencias"><span data-icon="cash"></span>Incidencias</a>
-        <a class="nav-link" href="#opina" data-view="opina"><span data-icon="star"></span>OPINA</a>
-        <a class="nav-link" href="#reportes" data-view="reportes"><span data-icon="file"></span>Reportes</a>
-        <a class="nav-link" href="#configuracion" data-view="configuracion"><span data-icon="settings"></span>Configuración</a>
+        <a class="nav-link" href="#panel" data-view="panel" title="Panel"><span data-icon="chart"></span><span class="nav-text">Panel</span></a>
+        <a class="nav-link" href="#docentes" data-view="docentes" title="Docentes"><span data-icon="users"></span><span class="nav-text">Docentes</span></a>
+        <a class="nav-link" href="#faltas" data-view="faltas" title="Faltas"><span data-icon="calendar"></span><span class="nav-text">Faltas</span></a>
+        <a class="nav-link" href="#incidencias" data-view="incidencias" title="Incidencias"><span data-icon="cash"></span><span class="nav-text">Incidencias</span></a>
+        <a class="nav-link" href="#opina" data-view="opina" title="OPINA"><span data-icon="star"></span><span class="nav-text">OPINA</span></a>
+        <a class="nav-link" href="#reportes" data-view="reportes" title="Reportes"><span data-icon="file"></span><span class="nav-text">Reportes</span></a>
+        <a class="nav-link" href="#configuracion" data-view="configuracion" title="Configuración"><span data-icon="settings"></span><span class="nav-text">Configuración</span></a>
       </nav>
 
       <div class="sidebar-footer">
@@ -56,6 +56,10 @@
         <button class="btn btn-ghost btn-icon menu-btn" id="menuBtn" type="button"
                 aria-label="Abrir menú" aria-controls="sidebar" aria-expanded="false">
           <span data-icon="menu"></span>
+        </button>
+        <button class="btn btn-ghost btn-icon colapsar-btn" id="colapsarBtn" type="button"
+                aria-label="Contraer menú" aria-controls="sidebar" aria-pressed="false" title="Contraer menú">
+          <span data-icon="sidebar"></span>
         </button>
         <h1 class="topbar-title" id="pageTitle">Panel</h1>
         <div class="topbar-actions">
@@ -86,6 +90,7 @@
   <script src="/js/incidencias.js"></script>
   <script src="/js/inasistencias.js"></script>
   <script src="/js/reportes.js"></script>
+  <script src="/js/resumen.js"></script>
   <script src="/js/catalogos.js"></script>
   <script src="/js/perfil.js"></script>
   <script src="/js/app.js"></script>
