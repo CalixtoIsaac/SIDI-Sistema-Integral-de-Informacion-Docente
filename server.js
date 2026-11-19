@@ -48,6 +48,7 @@ app.use('/api/reportes', require('./routes/reportes'));
 app.use('/api/incidencias', require('./routes/incidencias'));
 app.use('/api/analitica', require('./routes/analitica'));
 app.use('/api/configuracion', require('./routes/configuracion'));
+app.use('/api/respaldo', require('./routes/respaldo'));
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Ruta de la API no encontrada.' }));
 

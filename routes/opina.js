@@ -6,6 +6,7 @@
  *  GET    /api/opina/ranking?periodoId=&filtro=todos|mejores|peores|rango&n=&min=&max=&compararCon=&incluirMuestraInsuficiente=
  *                                        → ranking completo con promedios (HU-16)
  *  GET    /api/opina/ranking/excel?…     → descarga OPINA_RANKING_<PERIODO>.xlsx (mismo filtro)
+ *  GET    /api/opina/comparativo?periodos=1,2,3 → tabla docente × semestre con promedios por semestre
  *  GET    /api/opina/importaciones       → historial
  *  DELETE /api/opina/importaciones/:id   → 204
  *  GET    /api/opina/campus               → % OPP oficial del campus por semestre con variación (HU-24)
@@ -18,6 +19,7 @@ const opinaService = require('../services/opinaService');
 const rankingService = require('../services/rankingService');
 const { unArchivo } = require('../lib/subida');
 const opinaCampusService = require('../services/opinaCampusService');
+const opinaConsulta = require('../services/opinaConsultaService');
 const { HttpError, manejarErrores } = require('../lib/errores');
 
 const router = express.Router();
@@ -41,6 +43,8 @@ router.get('/ranking/excel', (req, res) => {
   res.set('Content-Disposition', `attachment; filename="${nombre}"`);
   res.send(buffer);
 });
+
+router.get('/comparativo', (req, res) => res.json(opinaConsulta.comparativo(db, req.query)));
 
 router.get('/importaciones', (req, res) => {
   res.json({ importaciones: opinaService.importaciones(db) });

@@ -196,11 +196,24 @@ const COMPARAR_NOMBRE = (a, b) => (`${a.apellidoPaterno} ${a.apellidoMaterno ?? 
 /**
  * Tabla de docentes. Query: page, limit (por defecto todos). Los filtros y la búsqueda
  * (HU-06, HU-07) se aplican con `filtrar`, que por ahora deja pasar todo.
+ * `conteos` = cuántos hay de cada estado con los MISMOS filtros y búsqueda, sin contar el filtro de
+ * estado (activo / incompleto): alimenta las pestañas Todos · Activos · Inactivos · Datos incompletos.
  */
 function listar(db, query = {}, opciones = {}) {
   const ctx = contexto(db, opciones.hoy);
+  const sinEstado = { ...query, activo: undefined, incompleto: undefined };
   let filas = docentesBase(db).map((d) => armarFila(d, ctx));
-  filas = (opciones.filtrar ?? ((f) => f))(filas, query, ctx);
+  filas = (opciones.filtrar ?? ((f) => f))(filas, sinEstado, ctx);
+  const conteos = {
+    todos: filas.length,
+    activos: filas.filter((f) => f.activo).length,
+    inactivos: filas.filter((f) => !f.activo).length,
+    incompletos: filas.filter((f) => f.incompleto.length > 0).length,
+  };
+  const activo = booleano(query.activo);
+  const incompleto = booleano(query.incompleto);
+  filas = filas.filter((f) => (activo === undefined || f.activo === activo)
+    && (incompleto === undefined || (f.incompleto.length > 0) === incompleto));
   filas.sort(opciones.comparar ?? COMPARAR_NOMBRE);
   const total = filas.length;
   const limit = entero(query.limit, LIMITE_MAXIMO, 1, LIMITE_MAXIMO);
@@ -210,6 +223,8 @@ function listar(db, query = {}, opciones = {}) {
     total,
     page,
     limit,
+    paginas: Math.max(1, Math.ceil(total / limit)),
+    conteos,
     periodo: ctx.periodo?.clave ?? null,
     periodoOpina: ctx.periodoOpina?.clave ?? null,
   };
