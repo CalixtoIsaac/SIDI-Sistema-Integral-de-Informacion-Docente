@@ -56,7 +56,7 @@ departamentos 1──* docentes        catalogos (cc_nomina, motivos, CeCo, text
 | Montos | `REAL` | MXN, 2 decimales |
 | % OPINA | calculado | 0–100 |
 
-## 4. DDL (`lib/migraciones/001_inicial.sql`)
+## 4. DDL (`lib/migraciones/`: 001_inicial.sql + 002_indice_horarios.sql)
 ```sql
 -- ===== Configuración del perfil (sin login) =====
 CREATE TABLE IF NOT EXISTS configuracion (
@@ -446,6 +446,8 @@ CREATE INDEX IF NOT EXISTS idx_opina_periodo     ON opina_respuestas(periodo_id,
 CREATE INDEX IF NOT EXISTS idx_bajas_docente     ON docente_bajas(docente_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_docentes_recont   ON docentes(recontratable);
 CREATE INDEX IF NOT EXISTS idx_envios_quincena   ON envios_correo(quincena_id);
+-- 🆕 002 · HU-22: docentes disponibles por día y hora (grupos a suplir)
+CREATE INDEX IF NOT EXISTS idx_horarios_dia_hora ON horarios(dia_semana, hora_inicio);
 ```
 
 ## 5. Reglas de negocio

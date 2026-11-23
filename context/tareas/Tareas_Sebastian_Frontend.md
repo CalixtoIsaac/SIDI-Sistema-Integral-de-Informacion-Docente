@@ -71,9 +71,9 @@
 | D6 | mar 10/11 | HU-10 | En el modal: elegir suplente y contrato | ⬜ |
 | D7 | mié 11/11 | HU-11 | Vista Incidencias (pagos adicionales) | ⬜ |
 | D7 | mié 11/11 | HU-12 | Pantalla Reportes (pendientes a incluir en la quincena) | ⬜ |
-| D8 | jue 12/11 | HU-14 | Vista de inasistencias por semestre | ⬜ |
-| D9 | vie 13/11 | HU-15 | Panel con gráficas | ⬜ |
-| D9 | vie 13/11 | HU-16 | Ranking OPINA con filtro mejores/peores y cuadro de promedios | ⬜ |
+| D8 | jue 12/11 | HU-14 | Vista de inasistencias por semestre (en Reportes) | 👀 |
+| D9 | vie 13/11 | HU-15 | Panel con gráficas | 👀 |
+| D9 | vie 13/11 | HU-16 | Ranking OPINA con filtro mejores/peores y cuadro de promedios | 👀 |
 | D9 | vie 13/11 | HU-19 | Vista semanal de horarios en la ficha | ⬜ |
 | D10 | mar 17/11 | D10 | Cierre Sprint 2: pulido de UI | ⬜ |
 
