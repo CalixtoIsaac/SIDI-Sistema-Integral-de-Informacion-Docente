@@ -5,6 +5,7 @@ Aplicación web local para la Coordinación de Docentes de Preparatoria Veracruz
 - **Backend:** Node.js + Express y SQLite (`better-sqlite3`). Sin login: se abre directo en el Panel (03 §1).
 - **Frontend:** HTML, CSS y JavaScript **sin frameworks** (módulos IIFE, sin compilación). Color principal (rosa por defecto) y modo claro/oscuro/automático elegibles en **Perfil**.
 - Documentación del proyecto en [`context/`](context/) (requerimientos, backlog, arquitectura, modelo de datos, UI/UX, API y formatos de Excel).
+- **Documentación final** en [`docs/`](docs/): [Reporte técnico](docs/REPORTE_TECNICO.md) · [Manual de usuario](docs/MANUAL_USUARIO.md) · [Manual técnico](docs/MANUAL_TECNICO.md).
 
 ## 1. Requisitos
 
