@@ -61,15 +61,21 @@ test('con reportes.agrupar_suplencias = 0 va una incidencia por día', () => {
   assert.equal(incidencias(db).length, 2);
 });
 
-test('contrato del suplente: 422 si no es suyo; vacío con aviso si no tiene', () => {
+test('contrato del suplente: se captura a mano (cualquier número), 422 si no son dígitos; vacío con aviso si no tiene', () => {
   const { db, ids, a16001 } = escenario();
   const [f] = faltas.crear(db, { ...BASE, docenteId: ids.maria, fechas: ['2026-08-17'], asignaturaIds: [a16001] }).faltas;
-  assert.throws(() => faltas.asignarSuplencia(db, f.id, { docenteSuplenteId: ids.guillermo, numContrato: '5500001' }),
-    (e) => e.status === 422 && e.code === 'CONTRATO_NO_ES_DEL_SUPLENTE' && e.details[0].contrato === '5500002');
+  // Retro de la cliente: el contrato del suplente no sale de los archivos, ella lo escribe
+  const manual = faltas.asignarSuplencia(db, f.id, { docenteSuplenteId: ids.guillermo, numContrato: ' 5699999 ' });
+  assert.deepEqual([manual.suplencia.numContrato, manual.avisos], ['5699999', []]);
+  assert.throws(() => faltas.asignarSuplencia(db, f.id, { docenteSuplenteId: ids.guillermo, numContrato: '56-99' }),
+    (e) => e.status === 422 && e.code === 'CONTRATO_INVALIDO');
   const r = faltas.asignarSuplencia(db, f.id, { docenteSuplenteId: ids.ana });
   assert.deepEqual([r.suplencia.numContrato, r.avisos], [null, ['SUPLENTE_SIN_CONTRATO']]);
   assert.throws(() => faltas.asignarSuplencia(db, f.id, { docenteSuplenteId: ids.maria }), { status: 400, code: 'SUPLENTE_ES_TITULAR' });
   assert.deepEqual(suplencias.contratos(db, ids.guillermo).map((c) => c.contrato), ['5500002']);
+  // A Ana (sin contratos en sus grupos) se le propone el último que se le capturó
+  faltas.asignarSuplencia(db, f.id, { docenteSuplenteId: ids.ana, numContrato: '5612345' });
+  assert.deepEqual(suplencias.contratos(db, ids.ana).map((c) => c.contrato), ['5612345']);
 });
 
 test('falta IMSS: no se descuenta, pero el suplente cobra la tarifa y se anota el folio', () => {
@@ -128,21 +134,21 @@ test('suplencias de tarifa normal: el texto no cambia (n días × tarifa = total
   assert.match(incidencias(db)[0].detalle, /a pagar 2 días\. 2 días\* 54\.00 = 108\.00$/);
 });
 
-test('si el contrato guardado del suplente ya no es suyo, el reporte avisa y al generar usa el vigente (no truena)', async () => {
+test('el contrato capturado del suplente se conserva aunque no esté en sus grupos (al editar, generar y en el reporte)', async () => {
   const reportes = require('../services/reporteService');
   const { db, ids, a16001 } = escenario();
-  faltas.crear(db, {
+  const [f] = faltas.crear(db, {
     ...BASE, docenteId: ids.maria, fechas: ['2026-08-17'], asignaturaIds: [a16001],
-    suplencias: [{ asignaturaId: a16001, fecha: '2026-08-17', docenteSuplenteId: ids.guillermo }],
-  });
-  // Se volvió a importar el reporte de contratos: el de Guillermo cambió de 5500002 a 5500009
-  db.prepare('UPDATE asignaturas SET num_contrato = ? WHERE docente_id = ?').run('5500009', ids.guillermo);
+    suplencias: [{ asignaturaId: a16001, fecha: '2026-08-17', docenteSuplenteId: ids.guillermo, numContrato: '5677777' }],
+  }).faltas;
+  faltas.actualizar(db, f.id, { observaciones: 'Cambio cualquiera' }); // se sincroniza la suplencia
+  assert.equal(incidencias(db)[0].num_contrato, '5677777');
   const q = { id: Number(db.prepare("INSERT INTO quincenas (anio, numero, fecha_inicio, fecha_fin, fecha_pago) VALUES (2026, 16, '2026-08-16', '2026-08-31', '2026-08-30')").run().lastInsertRowid) };
   const v = reportes.validarIncidencias(db, q.id);
-  assert.ok(v.avisos.some((a) => a.tipo === 'CONTRATO_NO_ES_DEL_SUPLENTE'));
+  assert.ok(!v.avisos.some((a) => /CONTRATO/.test(a.tipo)), JSON.stringify(v.avisos));
   const d = await reportes.generarDescuentos(db, q.id);
   assert.equal(d.asignadas, 1);
-  assert.equal(incidencias(db)[0].num_contrato, '5500009');
+  assert.equal(incidencias(db)[0].num_contrato, '5677777');
   const inc = await reportes.generarIncidencias(db, q.id);
-  assert.equal(inc.incidencias[0].numContrato, '5500009');
+  assert.equal(inc.incidencias[0].numContrato, '5677777');
 });

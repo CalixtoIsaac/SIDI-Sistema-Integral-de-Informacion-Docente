@@ -1,6 +1,8 @@
 # Modelo de Datos - SIDI
 Responsable: Uziel Armando García Duarte · Motor: **SQLite** (`better-sqlite3`, archivo `data/app.db`)
 
+> **Versión 2.5 (26/11/2026): sesión de prueba con la cliente.** Migración `003_retro_sesion_cliente.sql`: nueva justificación **`viaje_escolar`** (reconstruye `faltas` para ampliar el CHECK; conserva ids y suplencias) y se desactiva `horas_falta` '4 horas= 1/2 día' (siempre 8 h). El motivo de la falta es solo **No justificada** (→ `ninguna`, motivo 'Falta por asunto personal') o **Justificada** (Incapacidad IMSS, Cita IMSS o Viaje escolar → motivo 'Falta justificada'); el folio solo se pide con IMSS. El **contrato del suplente** lo captura la coordinadora a mano (solo dígitos): ya no se valida contra sus grupos.
+>
 > **Versión 2.4 (29/10/2026): retroalimentación de la vista previa** (*07 §8 #19–#27*). Nuevo en el esquema (migración `002_retro_cliente.sql`): **`opina_campus_semestre`** (% OPP oficial de Preparatoria Veracruz, 2 números por semestre), `tipos_clase.pago_mensual` (calculada), tabla **`docente_bajas`** (motivo, observaciones, recontratable) y `docentes.recontratable`, catálogo `motivo_baja`, **`contratos_importaciones`**, **`envios_correo`**, vista **`v_opina_campus`** y claves de configuración de correo. Los grupos de 4.5 h (en línea) no se importan.
 >
 > **Versión 2.3 (27/10/2026):** pendientes cerrados (*07 §8*). Nuevas fuentes: **Excel de grupos docentes** (CRN, materia, horario → horas/semana) y **CV en PDF** (CURP, fecha de nacimiento, género, grados). Se agregan los 12 campos de consulta del docente (*07 §7.2*), sesiones por falta, justificación IMSS, quincena de reporte, agrupación de suplencias y contrato del suplente. La hoja Detalle ya **no** usa vínculo externo.
@@ -56,7 +58,7 @@ departamentos 1──* docentes        catalogos (cc_nomina, motivos, CeCo, text
 | Montos | `REAL` | MXN, 2 decimales |
 | % OPINA | calculado | 0–100 |
 
-## 4. DDL (`lib/migraciones/`: 001_inicial.sql + 002_indice_horarios.sql)
+## 4. DDL (`lib/migraciones/`: 001_inicial.sql + 002_indice_horarios.sql + 003_retro_sesion_cliente.sql)
 ```sql
 -- ===== Configuración del perfil (sin login) =====
 CREATE TABLE IF NOT EXISTS configuracion (
@@ -112,10 +114,11 @@ CREATE TABLE IF NOT EXISTS catalogos (
 --                     'D1_Activ. Artísticas, Cult Y Dep.', 'LB_Impart CursoTallGral'
 --  cuenta_cargo: '5420103000' (académico), '5422101001' (artístico/cultural/deportivo, materias VSPP)
 --  motivo_falta: 'Falta por asunto personal', 'Falta injustificadas', 'Suspensión'
---  horas_falta: '8 horas= 1 día completo', '4 horas= 1/2 día'
+--  horas_falta: '8 horas= 1 día completo'   ('4 horas= 1/2 día' se desactivó en 003)
 --  situacion: 'Se hace descuento correspondiente por permiso personal sin justificación.' (ninguna)
 --             'No se hace descuento correspondiente por incapacidad del IMSS' (incapacidad_imss)
 --             'No se hace descuento correspondiente por cita médica IMSS' (cita_imss)
+--             'No se hace descuento correspondiente por viaje escolar' (viaje_escolar)   -- 003
 --  estatus_falta: 'Se descuenta y se toma la falta correspondiente.' (ninguna)
 --                 'No se descuenta y no se toma la falta correspondiente.' (incapacidad_imss)
 --                 'No se descuenta y no se toma la falta/permiso con goce correspondiente.' (cita_imss)
@@ -448,6 +451,69 @@ CREATE INDEX IF NOT EXISTS idx_docentes_recont   ON docentes(recontratable);
 CREATE INDEX IF NOT EXISTS idx_envios_quincena   ON envios_correo(quincena_id);
 -- 🆕 002 · HU-22: docentes disponibles por día y hora (grupos a suplir)
 CREATE INDEX IF NOT EXISTS idx_horarios_dia_hora ON horarios(dia_semana, hora_inicio);
+
+-- =====================================================================
+-- 003_retro_sesion_cliente.sql · SIDI · retroalimentación de la sesión con la cliente (26/11/2026)
+-- 1) Nueva justificación 'viaje_escolar' (falta Justificada sin folio IMSS, no se descuenta).
+--    SQLite no puede cambiar un CHECK: se reconstruye la tabla faltas conservando ids y datos.
+--    Con las llaves foráneas activas, borrar faltas borra en cascada sus suplencias: se respaldan
+--    antes en una tabla temporal y se regresan al final (mismos ids).
+-- 2) Las horas de la falta siempre son 8 horas = 1 día completo: se desactiva el medio día.
+-- =====================================================================
+
+CREATE TEMP TABLE suplencias_respaldo AS SELECT * FROM suplencias;
+
+CREATE TABLE faltas_nueva (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  quincena_id INTEGER REFERENCES quincenas(id),   -- NULL = pendiente de reportar
+  docente_id INTEGER NOT NULL REFERENCES docentes(id),
+  asignatura_id INTEGER REFERENCES asignaturas(id),
+  fecha TEXT,
+  sesion INTEGER NOT NULL DEFAULT 1 CHECK (sesion IN (1,2)),
+  fecha_texto TEXT,                               -- rango en descuentos manuales
+  dias INTEGER NOT NULL DEFAULT 1 CHECK (dias >= 1),
+  motivo TEXT NOT NULL,                           -- 'Falta por asunto personal' (no justificada) / 'Falta justificada'
+  horas_texto TEXT NOT NULL DEFAULT '8 horas= 1 día completo',
+  cuenta_cargo TEXT NOT NULL DEFAULT '5420103000',
+  justificacion TEXT NOT NULL DEFAULT 'ninguna' CHECK (justificacion IN ('ninguna','incapacidad_imss','cita_imss','viaje_escolar')),
+  folio_imss TEXT,                                -- solo incapacidad / cita IMSS
+  modo_calculo TEXT NOT NULL DEFAULT 'tarifa' CHECK (modo_calculo IN ('tarifa','manual')),
+  tarifa_aplicada REAL,                           -- copia de la tarifa del momento
+  monto_descuento REAL NOT NULL DEFAULT 0,
+  monto_editado INTEGER NOT NULL DEFAULT 0,
+  comentario TEXT,
+  ticket TEXT,
+  situacion TEXT,
+  estatus TEXT,
+  observaciones TEXT,
+  creado_en TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  UNIQUE (docente_id, asignatura_id, fecha, sesion)
+);
+
+INSERT INTO faltas_nueva (id, quincena_id, docente_id, asignatura_id, fecha, sesion, fecha_texto, dias, motivo, horas_texto,
+                    cuenta_cargo, justificacion, folio_imss, modo_calculo, tarifa_aplicada, monto_descuento, monto_editado,
+                    comentario, ticket, situacion, estatus, observaciones, creado_en)
+SELECT id, quincena_id, docente_id, asignatura_id, fecha, sesion, fecha_texto, dias, motivo, horas_texto,
+       cuenta_cargo, justificacion, folio_imss, modo_calculo, tarifa_aplicada, monto_descuento, monto_editado,
+       comentario, ticket, situacion, estatus, observaciones, creado_en
+FROM faltas;
+
+-- Conserva el contador de ids (no se reutilizan ids de faltas borradas)
+DELETE FROM sqlite_sequence WHERE name = 'faltas_nueva';
+INSERT INTO sqlite_sequence (name, seq) SELECT 'faltas_nueva', seq FROM sqlite_sequence WHERE name = 'faltas';
+
+DROP TABLE faltas;
+ALTER TABLE faltas_nueva RENAME TO faltas;
+
+INSERT INTO suplencias (id, falta_id, docente_suplente_id, incidencia_id, monto)
+SELECT id, falta_id, docente_suplente_id, incidencia_id, monto FROM suplencias_respaldo;
+DROP TABLE suplencias_respaldo;
+
+CREATE INDEX IF NOT EXISTS idx_faltas_quincena   ON faltas(quincena_id, docente_id);
+CREATE INDEX IF NOT EXISTS idx_faltas_pendientes ON faltas(fecha) WHERE quincena_id IS NULL;
+
+-- Ya no hay medio día (4 horas): toda falta es de 8 horas = 1 día completo
+UPDATE catalogos SET activo = 0 WHERE tipo = 'horas_falta' AND valor = '4 horas= 1/2 día';
 ```
 
 ## 5. Reglas de negocio
@@ -466,7 +532,11 @@ omitir CRN           = numero_grupo ∈ grupos.omitir_grupos (F61, F62 = en lín
 
 -- 🆕 Tipo de falta para el resumen ejecutivo (07 §8 #29; solo agrupa, no cambia los textos de Nacional)
 tipo_resumen(falta)  = justificacion IN ('incapacidad_imss','cita_imss') → 'Incapacidad médica'
+                       justificacion = 'viaje_escolar' → 'Viaje escolar'                                    -- 003
                        en otro caso (asunto personal, falta injustificada / no justificada) → 'Asunto personal'
+motivo               = No justificada → 'Falta por asunto personal' (col. F de Descuentos); Justificada → 'Falta justificada'
+horas_texto          = siempre '8 horas= 1 día completo' (modo tarifa)
+folio_imss           = obligatorio solo con incapacidad_imss / cita_imss
 tipo_clase           = tipos_clase(horas_semana, idioma)  -- sin coincidencia → NULL "Sin tarifa"
 tarifa_mensual       = tipos_clase.pago_semestre / 4                                                -- 🆕
 plan                 = modalidad 'Bachillerato Intercultural' → 'Bachillerato General Bilingüe'; si no 'Bachillerato General'
@@ -485,8 +555,8 @@ agrupación           = mismo suplente + mismo titular + mismo CRN + mismo mes +
                        texto de fechas: consecutivos 'del 1 al 4 de septiembre'; sueltos 'del día 24, 25, 27 y 28 de agosto'
 incidencia generada  = cc 'Flex Act. Acad de Apoyo', motivo 'B2_Cap.Profr(CADI Asore, Compet.)',
                        periodos 1, importe = Σ montos, detalle 'Sustituyó al docente … a pagar N días. N días* t = total …'
-contrato suplente    = uno de asignaturas.num_contrato del suplente (se valida que le pertenezca);
-                       por defecto el primero del periodo actual; NULL permitido con aviso si no tiene contratos
+contrato suplente    = lo captura la coordinadora a mano (solo dígitos, máx. 15; no sale de los archivos);
+                       se propone el primero de sus grupos o el último que se le capturó; NULL permitido con aviso
 
 -- Quincena de reporte
 al generar Qnn       = faltas e incidencias con quincena_id NULL y fecha ≤ quincenas.fecha_fin → se asignan a Qnn

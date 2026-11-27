@@ -2,7 +2,9 @@
  * Cálculo del descuento por falta (HU-09; 07 §3.1; 04 §5). Funciones sin escritura en la BD.
  *
  *   tarifa_aplicada = tipos_clase.pago_por_dia del CRN (o de la actividad)
- *   monto_descuento = justificacion = 'ninguna' ? tarifa (o el monto editado) : 0   (IMSS no se descuenta)
+ *   monto_descuento = justificacion = 'ninguna' ? tarifa (o el monto editado) : 0   (justificada no se descuenta)
+ *   motivo          = No justificada → 'Falta por asunto personal' (texto de la col. F de Descuentos);
+ *                     Justificada (IMSS o viaje escolar) → 'Falta justificada'. Horas: siempre 8 h = 1 día
  *   comentario      = 'CRN {crn} de {horas} horas a la semana, a descontar {m} = {m}'
  *                     actividad: '{nombre_actividad} de {horas} horas a la semana, …'
  *   cuenta_cargo    = 5422101001 para materias VSPP (deportivas/culturales); si no 5420103000
@@ -10,7 +12,14 @@
  */
 const { diaSemana } = require('../lib/horario');
 
-const JUSTIFICACIONES = ['ninguna', 'incapacidad_imss', 'cita_imss'];
+const JUSTIFICACIONES = ['ninguna', 'incapacidad_imss', 'cita_imss', 'viaje_escolar'];
+/** Solo las del IMSS piden folio. */
+const JUSTIFICACIONES_IMSS = ['incapacidad_imss', 'cita_imss'];
+const esImss = (justificacion) => JUSTIFICACIONES_IMSS.includes(justificacion);
+// Retro de la cliente (26/11/2026): el motivo solo es Justificada o No justificada.
+const MOTIVO_NO_JUSTIFICADA = 'Falta por asunto personal';
+const MOTIVO_JUSTIFICADA = 'Falta justificada';
+const motivoDe = (justificacion) => (justificacion === 'ninguna' ? MOTIVO_NO_JUSTIFICADA : MOTIVO_JUSTIFICADA);
 const CUENTA_ACADEMICA = '5420103000';
 const CUENTA_VSPP = '5422101001';
 const HORAS_DIA_COMPLETO = '8 horas= 1 día completo';
@@ -75,7 +84,8 @@ function calcularFila(db, a, { justificacion = 'ninguna', montoEditado = null } 
 }
 
 module.exports = {
-  JUSTIFICACIONES, CUENTA_ACADEMICA, CUENTA_VSPP, HORAS_DIA_COMPLETO,
+  JUSTIFICACIONES, JUSTIFICACIONES_IMSS, esImss, MOTIVO_NO_JUSTIFICADA, MOTIVO_JUSTIFICADA, motivoDe,
+  CUENTA_ACADEMICA, CUENTA_VSPP, HORAS_DIA_COMPLETO,
   asignaturaParaFalta, sesionesEseDia, etiquetaAsignatura, comentario, cuentaPorDefecto, textosDetalle, calcularFila,
   redondear, dinero,
 };

@@ -120,7 +120,8 @@ const Docentes = (() => {
 
   // ================================================================== LISTA
   function opcionesFiltro(f) {
-    return `<option value="">${UI.escape(f.etiqueta)}</option>` + f.opciones.map(([v, t]) => `<option value="${UI.escape(v)}">${UI.escape(t)}</option>`).join('');
+    // El rótulo solo se ve con el select cerrado; `hidden` lo quita de la lista desplegable
+    return `<option value="" selected hidden>${UI.escape(f.etiqueta)}</option>` + f.opciones.map(([v, t]) => `<option value="${UI.escape(v)}">${UI.escape(t)}</option>`).join('');
   }
 
   function plantillaLista() {
@@ -533,7 +534,7 @@ const Docentes = (() => {
     const columna = (dia) => carriles(bloques.filter((b) => b.dia === dia)).map((b) => {
       const etiqueta = b.a.crn || b.a.nombreActividad || 'Actividad';
       const titulo = `${etiqueta} · ${b.a.materia || ''}${b.a.numeroGrupo ? ` · grupo ${b.a.numeroGrupo}` : ''} · ${DIAS_LARGOS[b.dia]} ${b.inicio}–${b.termina}`;
-      return `<div class="semana-bloque tono-${b.i % 6}${b.a.crn ? '' : ' actividad'}" title="${UI.escape(titulo)}"
+      return `<div class="semana-bloque tono-${b.i % 6}${b.a.crn ? '' : ' actividad'}${b.fin - b.ini < 45 ? ' corto' : ''}" title="${UI.escape(titulo)}"
                   style="top:${pct(b.ini)};height:calc(${((b.fin - b.ini) / minutos) * 100}% - 2px);left:calc(${(b.carril / b.carriles) * 100}% + 2px);width:calc(${100 / b.carriles}% - 4px)">
                 <strong>${UI.escape(etiqueta)}</strong>
                 <span>${UI.escape(b.a.materia || '')}</span>

@@ -32,17 +32,15 @@ const Faltas = (() => {
     return a.crn ? `CRN ${a.crn}` : (a.nombreActividad || a.materia || 'Actividad');
   }
 
-  /** Lo que cobra el suplente: lo descontado; si no hubo descuento (IMSS), la tarifa del día. */
+  /** Lo que cobra el suplente: lo descontado; si no hubo descuento (justificada), la tarifa del día. */
   function pagoSuplente(fila) {
     if (!fila) return 0;
     return fila.montoDescuento > 0 ? fila.montoDescuento : (fila.tarifaAplicada ?? 0);
   }
 
   async function catalogosFalta() {
-    const [motivos, horas, cuentas] = await Promise.all([
-      Comun.catalogo('motivo_falta'), Comun.catalogo('horas_falta'), Comun.catalogo('cuenta_cargo')
-    ]);
-    return { motivos, horas, cuentas };
+    // Motivo (No justificada / Justificada) y horas (siempre 8 h = 1 día) ya no salen de catálogo
+    return { cuentas: await Comun.catalogo('cuenta_cargo') };
   }
 
   // ================================================================== selector de suplente (HU-10, HU-22)
@@ -65,6 +63,7 @@ const Faltas = (() => {
     let verTodos = Boolean(inicial && grupo && grupo.disponibles.some((d) => d.docenteId === inicial.docenteId && d.empalme));
     let elegido = inicial ? { ...inicial } : null;
     let extra = null; // suplente elegido que no está en la lista (alta rápida o buscado)
+    const listaId = `contratos-suplente-${Math.random().toString(36).slice(2, 9)}`;
     const lista = grupo ? grupo.disponibles : [];
     if (elegido && !lista.some((d) => d.docenteId === elegido.docenteId)) extra = { docenteId: elegido.docenteId, nombre: elegido.nombre };
 
@@ -95,14 +94,18 @@ const Faltas = (() => {
             <option value="__alta">+ Alta rápida (suplente nuevo)…</option>
           </select></div>
           ${elegido ? `
-            <div class="select-wrap" title="Contrato del suplente"><select class="input select" data-contrato aria-label="Contrato del suplente">
-              ${contratos.length
-                ? contratos.map((c) => `<option value="${UI.escape(c.contrato)}"${c.contrato === elegido.numContrato ? ' selected' : ''}>Contrato ${UI.escape(c.contrato)}${c.crn ? ` (CRN ${UI.escape(c.crn)})` : ''}</option>`).join('')
-                : '<option value="">Sin contrato</option>'}
-            </select></div>` : ''}
+            <div class="suplente-contrato" title="Contrato del suplente">
+              <input class="input" data-contrato inputmode="numeric" maxlength="15" autocomplete="off"
+                     list="${listaId}" placeholder="Nº de contrato" aria-label="Contrato del suplente"
+                     value="${UI.escape(elegido.numContrato || '')}">
+              <datalist id="${listaId}">${contratos.map((c) => `<option value="${UI.escape(c.contrato)}">${c.crn ? `CRN ${UI.escape(c.crn)}` : 'Usado antes'}</option>`).join('')}</datalist>
+            </div>` : ''}
           ${grupo && conEmpalme.length ? `<label class="check small"><input type="checkbox" data-ver-todos${verTodos ? ' checked' : ''}>Ver todos</label>` : ''}
         </div>
-        ${elegido && !contratos.length ? `<p class="small aviso-inline">${UI.icon('warning')}No tiene contratos: la suplencia se guarda sin contrato (aviso en Reportes).</p>` : ''}
+        ${elegido ? `<p class="small muted" data-contrato-hint>${contratos.length
+          ? 'Contrato del suplente: se propone el de sus grupos; puedes escribir otro.'
+          : 'Escribe el contrato del suplente (no viene en los archivos). Si lo dejas vacío, aparece como aviso en Reportes.'}</p>` : ''}
+        <p class="small aviso-inline" data-contrato-error hidden>${UI.icon('warning')}El contrato solo lleva números.</p>
         ${elegido && elegido.avisoNoRecontratable ? `<p class="small aviso-inline">${UI.icon('warning')}Este docente es "No recontratable".</p>` : ''}`;
     }
 
@@ -114,13 +117,26 @@ const Faltas = (() => {
       if (onChange) onChange(elegido);
     }
 
+    /** Contrato escrito a mano (o elegido de la lista): solo dígitos. No se repinta para no perder el foco. */
+    function tomarContrato(input) {
+      const v = input.value.trim();
+      const valido = v === '' || /^\d+$/.test(v);
+      input.classList.toggle('input-invalida', !valido);
+      input.setAttribute('aria-invalid', String(!valido));
+      const err = cont.querySelector('[data-contrato-error]');
+      if (err) err.hidden = valido;
+      elegido.numContrato = valido && v ? v : null;
+      elegido.contratoInvalido = !valido;
+      if (onChange) onChange(elegido);
+    }
+
+    cont.addEventListener('input', (e) => {
+      if (e.target.matches('[data-contrato]')) tomarContrato(e.target);
+    });
+
     cont.addEventListener('change', async (e) => {
       if (e.target.matches('[data-ver-todos]')) { verTodos = e.target.checked; pintar(); return; }
-      if (e.target.matches('[data-contrato]')) {
-        elegido.numContrato = e.target.value || null;
-        if (onChange) onChange(elegido);
-        return;
-      }
+      if (e.target.matches('[data-contrato]')) { tomarContrato(e.target); return; }
       if (!e.target.matches('[data-suplente]')) return;
       const v = e.target.value;
       if (v === '') { elegido = null; pintar(); if (onChange) onChange(null); return; }
@@ -238,17 +254,22 @@ const Faltas = (() => {
           <section class="rf-sec">
             <p class="section-title" data-num-detalle>4. Motivo y justificación</p>
             <div class="form-grid">
-              <div class="field"><label>Motivo <span class="req">*</span></label>${Comun.selectHtml('motivo', cat.motivos.map((c) => c.valor), cat.motivos[0] && cat.motivos[0].valor)}</div>
-              <div class="field" data-campo-horas><label>Horas de la falta</label>${Comun.selectHtml('horasTexto', cat.horas.map((c) => c.valor), cat.horas[0] && cat.horas[0].valor)}</div>
+              <div class="field full"><label>Motivo <span class="req">*</span></label>
+                <div class="seg" role="radiogroup" aria-label="Motivo">
+                  <label><input type="radio" name="motivoTipo" value="no" checked>No justificada</label>
+                  <label><input type="radio" name="motivoTipo" value="si">Justificada</label>
+                </div>
+                <p class="hint" data-hint-nojust>Se registra como <strong>${UI.escape(Comun.JUSTIFICACION.ninguna)}</strong> y se descuenta. Horas: <strong>8 horas = 1 día completo</strong>.</p>
+              </div>
+              <div class="field full" data-campo-justificacion hidden><label>Justificación <span class="req">*</span></label>
+                <div class="radio-list">
+                  ${Object.entries(Comun.JUSTIFICADAS).map(([v, t], i) => `<label><input type="radio" name="justificacion" value="${v}"${i === 0 ? ' checked' : ''}>${UI.escape(t)}</label>`).join('')}
+                  <input class="input rf-folio" name="folioImss" maxlength="30" placeholder="Folio IMSS *" aria-label="Folio IMSS">
+                </div>
+                <p class="hint" data-hint-imss>Justificada: no se descuenta, pero al suplente sí se le paga la tarifa del día. Horas: 8 horas = 1 día completo.</p>
+              </div>
               <div class="field"><label>Cuenta de cargo</label>${Comun.selectHtml('cuentaCargo', opcionesCuenta, '')}</div>
               <div class="field"><label>Ticket (opcional)</label><input class="input" name="ticket" maxlength="50"></div>
-              <div class="field full"><label>Justificación</label>
-                <div class="radio-list">
-                  ${Object.entries(Comun.JUSTIFICACION).map(([v, t], i) => `<label><input type="radio" name="justificacion" value="${v}"${i === 0 ? ' checked' : ''}>${UI.escape(t)}</label>`).join('')}
-                  <input class="input rf-folio" name="folioImss" maxlength="30" placeholder="Folio IMSS *" hidden aria-label="Folio IMSS">
-                </div>
-                <p class="hint" data-hint-imss hidden>Con justificación IMSS no se descuenta, pero al suplente sí se le paga la tarifa del día.</p>
-              </div>
               <div class="field full"><label>Observaciones (van al texto de la suplencia)</label>
                 <input class="input" name="observaciones" maxlength="500" placeholder="Ej. Viaja a CDMX por examen"></div>
             </div>
@@ -387,23 +408,29 @@ const Faltas = (() => {
     }
 
     // ---------------------------------------------------------- campos comunes
+    /** 'ninguna' si es No justificada; si es Justificada, la razón elegida (IMSS o viaje escolar). */
+    function justificacionActual() {
+      if (f.querySelector('[name="motivoTipo"]:checked').value === 'no') return 'ninguna';
+      return f.querySelector('[name="justificacion"]:checked').value;
+    }
+
     function comunes() {
-      const justificacion = f.querySelector('[name="justificacion"]:checked').value;
+      const justificacion = justificacionActual();
       const c = {
-        motivo: f.elements.motivo.value,
         justificacion,
         observaciones: f.elements.observaciones.value.trim() || null,
         ticket: f.elements.ticket.value.trim() || null
       };
       if (f.elements.cuentaCargo.value) c.cuentaCargo = f.elements.cuentaCargo.value;
-      if (justificacion !== 'ninguna') c.folioImss = f.elements.folioImss.value.trim() || null;
+      if (Comun.esImss(justificacion)) c.folioImss = f.elements.folioImss.value.trim() || null;
       return c;
     }
 
     function pintarJustificacion() {
-      const imss = f.querySelector('[name="justificacion"]:checked').value !== 'ninguna';
-      f.elements.folioImss.hidden = !imss;
-      $('[data-hint-imss]').hidden = !imss;
+      const justificada = justificacionActual() !== 'ninguna';
+      $('[data-campo-justificacion]').hidden = !justificada;
+      $('[data-hint-nojust]').hidden = justificada;
+      f.elements.folioImss.hidden = !Comun.esImss(justificacionActual());
     }
 
     // ---------------------------------------------------------- peticiones por grupo de días
@@ -431,7 +458,7 @@ const Faltas = (() => {
         modo: 'tarifa',
         fechas: lote.fechas,
         asignaturaIds: lote.ids,
-        horasTexto: f.elements.horasTexto.value,
+        // Siempre 8 horas = 1 día completo (retro de la cliente: ya no hay medio día)
         ...comunes(),
         montos: solo(st.montos),
         contratos: solo(st.contratos),
@@ -574,7 +601,7 @@ const Faltas = (() => {
           <thead><tr><th>Fecha</th><th>CRN / actividad</th><th>Materia</th>${manual ? '<th class="num">Días</th>' : '<th class="num">Tarifa</th>'}
             <th class="num">Descuento</th><th>Cuenta</th><th>Comentario</th><th>Avisos</th></tr></thead>
           <tbody>${filas.map((x) => {
-            const editable = !manual && f.querySelector('[name="justificacion"]:checked').value === 'ninguna';
+            const editable = !manual && justificacionActual() === 'ninguna';
             const avisos = x.avisos.filter((a) => a !== 'SIN_CONTRATO' || !st.contratos[x.asignaturaId]);
             return `<tr>
               <td class="nowrap">${x.fecha ? UI.escape(UI.fecha(x.fecha)) : UI.escape(x.fechaTexto || '')}${x.sesion === 2 ? ' <span class="badge badge-info badge-plain">2ª sesión</span>' : ''}</td>
@@ -675,7 +702,6 @@ const Faltas = (() => {
         st.modo = t.value;
         $('[data-tarifa]').hidden = st.modo !== 'tarifa';
         $('[data-manual]').hidden = st.modo !== 'manual';
-        $('[data-campo-horas]').hidden = st.modo !== 'tarifa';
         $('[data-sec-suplir]').hidden = st.modo !== 'tarifa';
         $('[data-num-detalle]').textContent = st.modo === 'tarifa' ? '4. Motivo y justificación' : '3. Motivo y justificación';
         $('[data-num-preview]').textContent = st.modo === 'tarifa' ? '6. Vista previa' : '4. Vista previa';
@@ -702,9 +728,9 @@ const Faltas = (() => {
         refrescar();
         return;
       }
-      if (t.name === 'justificacion') pintarJustificacion();
+      if (t.name === 'justificacion' || t.name === 'motivoTipo') pintarJustificacion();
       if (t.closest('[data-suplir]')) return; // lo maneja el selector de suplente
-      if (t.closest('.form-grid') || t.name === 'justificacion') refrescar();
+      if (t.closest('.form-grid') || t.name === 'justificacion' || t.name === 'motivoTipo') refrescar();
     });
     f.addEventListener('input', (e) => {
       if (e.target.closest('[data-manual]') || ['folioImss', 'observaciones', 'ticket'].includes(e.target.name)) refrescar();
@@ -714,6 +740,7 @@ const Faltas = (() => {
     f.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!st.docente) { UI.toast('Elige al docente que faltó.', 'warning'); buscador.enfocar(); return; }
+      if ([...st.suplencias.values()].some((s) => s && s.contratoInvalido)) { UI.toast('El contrato del suplente solo lleva números.', 'warning'); return; }
       errorBox.hidden = true;
       UI.setBusy(btnGuardar, true);
       let creadas = 0;
@@ -787,7 +814,7 @@ const Faltas = (() => {
               : `<p class="small muted">${conHorario ? 'Ese CRN no tiene horario ese día: busca al suplente por nombre.' : 'Busca al suplente por nombre o nómina.'}</p><div data-buscar></div>`}
             <div data-picker></div>
             <div class="field"><label>Monto a pagar (opcional)</label>
-              <div class="input-group"><span class="input-addon">$</span><input class="input" name="monto" type="number" min="0" step="0.01" placeholder="Igual a lo descontado (o la tarifa si es IMSS)"></div></div>
+              <div class="input-group"><span class="input-addon">$</span><input class="input" name="monto" type="number" min="0" step="0.01" placeholder="Igual a lo descontado (o la tarifa si es justificada)"></div></div>
             <div class="alert alert-error" data-error role="alert" hidden></div>
           </div>`,
         footerHtml: `
@@ -834,6 +861,7 @@ const Faltas = (() => {
         e.preventDefault();
         errorBox.hidden = true;
         if (!elegido) { errorBox.textContent = 'Elige al docente que cubrió.'; errorBox.hidden = false; return; }
+        if (elegido.contratoInvalido) { errorBox.textContent = 'El contrato del suplente solo lleva números.'; errorBox.hidden = false; return; }
         const btn = f.querySelector('[type="submit"]');
         UI.setBusy(btn, true);
         const body = { docenteSuplenteId: elegido.docenteId, numContrato: elegido.numContrato || null };
@@ -846,9 +874,6 @@ const Faltas = (() => {
         } catch (err) {
           UI.setBusy(btn, false);
           UI.pintarError(errorBox, err);
-          if (err.code === 'CONTRATO_NO_ES_DEL_SUPLENTE' && err.details.length) {
-            errorBox.insertAdjacentHTML('beforeend', `<p class="small">Contratos del suplente: ${err.details.map((c) => UI.escape(c.contrato)).join(', ')}</p>`);
-          }
         }
       });
     });
@@ -861,13 +886,14 @@ const Faltas = (() => {
     try { cat = await catalogosFalta(); } catch (err) { UI.toast(err.message, 'error'); return false; }
     const manual = falta.modo === 'manual';
     const fields = [
-      { name: 'motivo', label: 'Motivo', type: 'select', required: true, options: cat.motivos.map((c) => ({ value: c.valor, label: c.valor })) },
-      manual
-        ? { name: 'horasTexto', label: 'Horas (texto)', required: true, maxlength: 60 }
-        : { name: 'horasTexto', label: 'Horas de la falta', type: 'select', options: cat.horas.map((c) => ({ value: c.valor, label: c.valor })) },
+      // Motivo: No justificada (permiso personal, se descuenta) o Justificada (IMSS o viaje escolar)
+      { name: 'justificacion', label: 'Motivo', type: 'select', required: true, options: [
+        { value: 'ninguna', label: `No justificada · ${Comun.JUSTIFICACION.ninguna}` },
+        ...Object.entries(Comun.JUSTIFICADAS).map(([value, label]) => ({ value, label: `Justificada · ${label}` }))
+      ] },
+      ...(manual ? [{ name: 'horasTexto', label: 'Horas (texto)', required: true, maxlength: 60 }] : []),
       { name: 'cuentaCargo', label: 'Cuenta de cargo', type: 'select', options: cat.cuentas.map((c) => ({ value: c.valor, label: `${c.valor}${c.descripcion ? ` · ${c.descripcion}` : ''}` })) },
-      { name: 'justificacion', label: 'Justificación', type: 'select', options: Object.entries(Comun.JUSTIFICACION).map(([value, label]) => ({ value, label })) },
-      { name: 'folioImss', label: 'Folio IMSS (si hay justificación)', maxlength: 30 },
+      { name: 'folioImss', label: 'Folio IMSS (solo incapacidad o cita IMSS)', maxlength: 30 },
       { name: 'monto', label: manual ? 'Monto a descontar' : 'Descuento (vacío = tarifa del día)', type: 'number', step: '0.01', min: 0 },
       ...(manual ? [
         { name: 'fechaTexto', label: 'Periodo (texto)', required: true, maxlength: 60 },
@@ -887,10 +913,10 @@ const Faltas = (() => {
       },
       onSubmit: (v) => {
         const body = {
-          motivo: v.motivo, horasTexto: v.horasTexto, cuentaCargo: v.cuentaCargo, justificacion: v.justificacion,
-          folioImss: v.folioImss || null, ticket: v.ticket || null, observaciones: v.observaciones || null
+          cuentaCargo: v.cuentaCargo, justificacion: v.justificacion,
+          folioImss: Comun.esImss(v.justificacion) ? v.folioImss || null : null, ticket: v.ticket || null, observaciones: v.observaciones || null
         };
-        if (manual) { body.fechaTexto = v.fechaTexto; body.dias = Number(v.dias); }
+        if (manual) { body.horasTexto = v.horasTexto; body.fechaTexto = v.fechaTexto; body.dias = Number(v.dias); }
         if (v.monto !== '') body.monto = Number(v.monto);
         else if (!manual && falta.montoEditado) body.restaurarMonto = true;
         return UI.api(`/faltas/${falta.id}`, { method: 'PUT', body });
@@ -936,11 +962,11 @@ const Faltas = (() => {
             <td class="nowrap">${x.fecha ? UI.escape(UI.fecha(x.fecha)) : UI.escape(x.fechaTexto || '—')}${x.sesion === 2 ? ' <span class="badge badge-info badge-plain">2ª</span>' : ''}${x.modo === 'manual' ? ' <span class="badge badge-outline badge-plain">Manual</span>' : ''}</td>
             <td class="nowrap">${UI.guion(x.asignatura && x.asignatura.crn)}</td>
             <td>${UI.guion(x.asignatura && x.asignatura.materia)}</td>
-            <td>${UI.escape(x.motivo)}</td>
+            <td>${x.justificacion === 'ninguna' ? 'No justificada' : 'Justificada'}</td>
             <td>${x.justificacion === 'ninguna' ? '<span class="cell-muted">—</span>' : `<span class="badge badge-info badge-plain">${UI.escape(Comun.JUSTIFICACION[x.justificacion])}</span>`}</td>
             <td class="num">${UI.dinero(x.montoDescuento)}${x.montoEditado ? ' <span title="Monto editado">✎</span>' : ''}</td>
             <td class="nowrap">${x.suplencia
-              ? `${UI.escape(x.suplencia.suplente)} <span class="small muted">${UI.dinero(x.suplencia.monto)}</span>${bloqueada ? '' : ` <button type="button" class="link-btn small" data-accion="suplente">Cambiar</button>`}${x.suplencia.numContrato ? '' : ' <span class="badge badge-warning badge-plain" title="Suplencia sin contrato del suplente">Sin contrato</span>'}`
+              ? `${UI.escape(x.suplencia.suplente)} <span class="small muted">${UI.dinero(x.suplencia.monto)}</span>${bloqueada ? '' : ` <button type="button" class="link-btn small" data-accion="suplente">Cambiar</button>`}${x.suplencia.numContrato || bloqueada ? '' : ' <button type="button" class="link-btn small" data-accion="suplente" title="Escribe el contrato del suplente">Capturar contrato</button>'}`
               : bloqueada ? '<span class="cell-muted">—</span>' : `<span class="cell-muted">—</span> <button type="button" class="btn btn-outline btn-sm" data-accion="suplente">Asignar</button>`}</td>
             <td class="nowrap">${bloqueada ? '' : `
               <button type="button" class="btn btn-ghost btn-icon btn-sm" data-accion="editar" aria-label="Editar">${UI.icon('pencil')}</button>

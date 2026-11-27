@@ -244,11 +244,10 @@ const Comun = (() => {
     FALTA_REPETIDA: 'Ya hay una falta registrada para ese CRN, día y sesión',
     SIN_CLASE_ESE_DIA: 'No tiene clase ese día',
     SEGUNDA_SESION_SIN_HORARIO: '2ª sesión sin horario ese día',
-    IMSS_SOLO_DETALLE: 'Justificada IMSS: no va en Descuentos, solo en Detalle',
+    IMSS_SOLO_DETALLE: 'Falta justificada: no va en Descuentos, solo en Detalle',
     MONTO_EDITADO: 'Monto editado a mano',
     MONTO_CERO: 'Monto en $0.00',
     SUPLENTE_SIN_CONTRATO: 'Suplencia sin contrato del suplente',
-    CONTRATO_NO_ES_DEL_SUPLENTE: 'El contrato guardado ya no es del suplente (al generar se usa el vigente)',
     SUPLENTE_INACTIVO: 'El suplente está inactivo',
     SUPLENTE_NO_RECONTRATABLE: 'El suplente es "No recontratable"',
     NO_RECONTRATABLE: 'No recontratable',
@@ -272,10 +271,14 @@ const Comun = (() => {
       </div>`;
   }
 
-  const JUSTIFICACION = { ninguna: 'Ninguna (permiso personal)', incapacidad_imss: 'Incapacidad IMSS', cita_imss: 'Cita IMSS' };
+  const JUSTIFICACION = { ninguna: 'Ninguna (permiso personal)', incapacidad_imss: 'Incapacidad IMSS', cita_imss: 'Cita IMSS', viaje_escolar: 'Viaje escolar' };
+  /** Razones de una falta Justificada (la No justificada siempre es 'ninguna'). */
+  const JUSTIFICADAS = { incapacidad_imss: JUSTIFICACION.incapacidad_imss, cita_imss: JUSTIFICACION.cita_imss, viaje_escolar: JUSTIFICACION.viaje_escolar };
+  /** Solo las justificaciones del IMSS piden folio. */
+  const esImss = (justificacion) => justificacion === 'incapacidad_imss' || justificacion === 'cita_imss';
 
   return {
-    DIAS_LARGOS, DIAS_CORTOS, JUSTIFICACION,
+    DIAS_LARGOS, DIAS_CORTOS, JUSTIFICACION, JUSTIFICADAS, esImss,
     hoyIso, diaDeFecha, fechaLarga,
     etiquetaQuincena, chipEstado, quincenas, selectorQuincena,
     buscadorDocente, catalogo, selectHtml, aviso, stat

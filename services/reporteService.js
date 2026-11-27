@@ -161,8 +161,7 @@ function filaIncidencia(i) {
 function avisosIncidencia(db, i) {
   const avisos = [];
   if (!i.num_contrato) avisos.push(i.origen === 'suplencia' ? 'SUPLENTE_SIN_CONTRATO' : 'SIN_CONTRATO');
-  // El contrato guardado ya no aparece en las asignaturas del suplente: al generar se cambia por el vigente
-  else if (i.origen === 'suplencia' && !suplenciaService.contratoVigente(db, i.docente_id, i.num_contrato)) avisos.push('CONTRATO_NO_ES_DEL_SUPLENTE');
+  // El contrato del suplente lo captura la coordinadora (no sale de los archivos): no se compara con sus grupos.
   if (i.elemento_pep && i.elemento_pep.length > 24) avisos.push('PEP_MAYOR_A_24');
   if (i.orden_interna && i.orden_interna.length > 12) avisos.push('ORDEN_INTERNA_MAYOR_A_12');
   if (!/^\d{10}$/.test(String(i.ceco ?? ''))) avisos.push('CECO_INVALIDO');

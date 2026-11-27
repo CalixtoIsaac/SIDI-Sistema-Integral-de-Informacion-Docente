@@ -15,3 +15,9 @@ data/cv/
 
 # Datos de demo (scripts/demo.js): se generan, no se suben
 data/demo/
+
+# Instalador de Windows (npm run dist): se publica como Release, no en git
+build/win-unpacked/
+dist/
+
+Claude outputs/

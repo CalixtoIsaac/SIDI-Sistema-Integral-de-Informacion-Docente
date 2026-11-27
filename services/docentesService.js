@@ -18,7 +18,7 @@ const { nombreCompleto } = require('../lib/nombres');
 const { HttpError } = require('../lib/errores');
 const periodosService = require('./periodosService');
 
-const RAIZ = path.join(__dirname, '..');
+const { CARPETA_CV, resolverRutaDatos } = require('../lib/rutas');
 const LIMITE_MAXIMO = 500;
 
 // ------------------------------------------------------------------ consultas base
@@ -394,9 +394,8 @@ function archivoCv(db, id) {
   obtenerDocente(db, id);
   const cv = db.prepare('SELECT ruta, nombre_original FROM cv_archivos WHERE docente_id = ? ORDER BY id DESC LIMIT 1').get(id);
   if (!cv) throw new HttpError(404, 'Este docente no tiene CV cargado.', 'SIN_CV');
-  const carpeta = path.join(RAIZ, 'data', 'cv');
-  const ruta = path.resolve(RAIZ, cv.ruta);
-  if (!ruta.startsWith(carpeta + path.sep) || !fs.existsSync(ruta)) {
+  const ruta = resolverRutaDatos(cv.ruta);
+  if (!ruta.startsWith(CARPETA_CV + path.sep) || !fs.existsSync(ruta)) {
     throw new HttpError(404, 'No se encontró el archivo del CV en data/cv/.', 'CV_NO_ENCONTRADO');
   }
   return { ruta, nombre: cv.nombre_original };
