@@ -1,13 +1,14 @@
 {
   "name": "plantilla-express-sqlite",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Plantilla base para proyectos web con Node.js, Express, SQLite y JavaScript sin frameworks.",
   "main": "server.js",
   "private": true,
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "dist": "node scripts/empaquetar.js"
   },
   "engines": {
     "node": ">=20"
@@ -24,6 +25,10 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
-    "pdf-lib": "^1.17.1"
+    "@electron/get": "^5.1.0",
+    "extract-zip": "^2.0.1",
+    "pdf-lib": "^1.17.1",
+    "pe-library": "^2.0.3",
+    "resedit": "^3.1.1"
   }
 }

@@ -49,22 +49,28 @@ function monto(v, campo, valor) {
 
 /**
  * Campos comunes a los dos modos (motivo, horas, cuenta, justificación, folio, notas).
- * En modo manual las horas son texto libre ('6 horas= 14 días'); en modo tarifa, del catálogo.
+ * En modo manual las horas son texto libre ('6 horas= 14 días'); en modo tarifa, del catálogo
+ * (siempre 8 h = 1 día completo si no se manda).
+ * Motivo: si no se manda, sale de la justificación (No justificada / Justificada). El folio solo
+ * se pide con incapacidad o cita del IMSS (el viaje escolar no lleva folio).
  */
 function comunes(db, v, body, { manual = false } = {}) {
   const justificacion = v.opcion('justificacion', body.justificacion ?? 'ninguna', d.JUSTIFICACIONES);
   const folio = v.texto('folioImss', body.folioImss, { max: 30 });
-  if (justificacion && justificacion !== 'ninguna' && !folio) v.error('folioImss', 'OBLIGATORIO');
+  if (d.esImss(justificacion) && !folio) v.error('folioImss', 'OBLIGATORIO');
+  const motivo = body.motivo === undefined || body.motivo === null || String(body.motivo).trim() === ''
+    ? (justificacion ? d.motivoDe(justificacion) : null)
+    : deCatalogo(db, v, 'motivo', 'motivo_falta', body.motivo, { obligatorio: true });
   const cuenta = v.texto('cuentaCargo', body.cuentaCargo, { max: 10 });
   if (cuenta && !/^\d{10}$/.test(cuenta)) v.error('cuentaCargo', 'DIEZ_DIGITOS');
   return {
-    motivo: deCatalogo(db, v, 'motivo', 'motivo_falta', body.motivo, { obligatorio: true }),
+    motivo,
     horasTexto: manual
       ? v.texto('horasTexto', body.horasTexto, { obligatorio: true, max: 60 })
       : deCatalogo(db, v, 'horasTexto', 'horas_falta', body.horasTexto, { porDefecto: d.HORAS_DIA_COMPLETO }),
     cuentaCargo: cuenta,
     justificacion,
-    folioImss: justificacion === 'ninguna' ? null : folio,
+    folioImss: d.esImss(justificacion) ? folio : null,
     observaciones: v.texto('observaciones', body.observaciones, { max: 500 }),
     ticket: v.texto('ticket', body.ticket, { max: 50 }),
   };
@@ -419,8 +425,12 @@ function cambios(db, body, actual) {
   }
   const justificacion = c.justificacion ?? actual.justificacion;
   const folio = trae(body, 'folioImss') ? c.folio_imss : actual.folio_imss;
-  if (justificacion !== 'ninguna' && !folio) v.error('folioImss', 'OBLIGATORIO');
-  if (justificacion === 'ninguna') c.folio_imss = null;
+  if (d.esImss(justificacion) && !folio) v.error('folioImss', 'OBLIGATORIO');
+  if (!d.esImss(justificacion)) c.folio_imss = null;
+  // Si cambió de No justificada a Justificada (o al revés) y no se mandó motivo, se ajusta solo
+  if (!trae(body, 'motivo') && c.justificacion && (c.justificacion === 'ninguna') !== (actual.justificacion === 'ninguna')) {
+    c.motivo = d.motivoDe(c.justificacion);
+  }
   v.terminar();
   return c;
 }

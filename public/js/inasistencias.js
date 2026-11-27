@@ -63,12 +63,12 @@ const Inasistencias = (() => {
       return `<div class="empty-state small-empty"><span class="empty-icon">${UI.icon('check')}</span>
         <h3>Sin faltas en este semestre</h3><p class="muted">Las faltas se registran en <a href="#faltas">Faltas</a>.</p></div>`;
     }
-    const medica = r.porTipo.find((t) => t.tipo === 'Incapacidad médica');
+    const sinDescuento = r.porTipo.filter((t) => t.tipo !== 'Asunto personal' && t.faltas);
     return `
       <div class="stats stats-5">
         ${Comun.stat('Número de faltas', String(i.faltas), { icono: 'calendar', tono: 'tone-warning', sub: `${i.diasFaltados} día(s) faltados` })}
         ${Comun.stat('Profesores que faltaron', String(i.profesores), { icono: 'users', tono: 'tone-primary' })}
-        ${Comun.stat('Descontado', UI.escape(UI.dinero(i.montoDescontado)), { icono: 'cash', tono: 'tone-warning', sub: medica?.faltas ? `${medica.faltas} por incapacidad médica (sin descuento)` : '' })}
+        ${Comun.stat('Descontado', UI.escape(UI.dinero(i.montoDescontado)), { icono: 'cash', tono: 'tone-warning', sub: sinDescuento.length ? `${sinDescuento.map((t) => `${t.faltas} por ${t.tipo.toLowerCase()}`).join(' · ')} (sin descuento)` : '' })}
         ${Comun.stat('Pagado a suplentes', UI.escape(UI.dinero(i.pagadoSuplentes)), { icono: 'cash', tono: 'tone-primary', sub: `${i.cubiertas} falta(s) cubiertas` })}
       </div>
       <div class="inasistencias-grid mt">
@@ -76,7 +76,7 @@ const Inasistencias = (() => {
           <p class="section-title">Faltas por motivo</p>
           ${Graficas.barras(r.porMotivo.map((m) => ({ etiqueta: m.motivo, valor: m.faltas, nota: `${m.profesores} prof.` })), { etiquetaAncho: '160px' })}
           <p class="section-title mt">Por tipo</p>
-          ${Graficas.barras(r.porTipo.map((t) => ({ etiqueta: t.tipo, valor: t.faltas, nota: `${t.profesores} prof.`, tono: t.tipo === 'Incapacidad médica' ? 'neutro' : 'primario' })), { etiquetaAncho: '160px' })}
+          ${Graficas.barras(r.porTipo.map((t) => ({ etiqueta: t.tipo, valor: t.faltas, nota: `${t.profesores} prof.`, tono: t.tipo === 'Asunto personal' ? 'primario' : 'neutro' })), { etiquetaAncho: '160px' })}
         </div>
         <div>
           <p class="section-title">Profesores que faltaron</p>

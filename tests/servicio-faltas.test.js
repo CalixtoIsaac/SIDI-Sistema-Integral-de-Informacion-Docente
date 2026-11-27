@@ -157,3 +157,38 @@ test('monto editado por día: la clave "asignaturaId|fecha" (o con sesión) gana
   const soloUnDia = faltas.preview(db, { ...cuerpo, fechas: ['2026-08-24', '2026-08-27'], montos: { [`${a}|2026-08-27`]: 30 } });
   assert.deepEqual(soloUnDia.filas.map((f) => [f.montoDescuento, f.montoEditado]), [[54, false], [30, true]]);
 });
+
+// ------------------------------------------------- retro de la sesión con la cliente (26/11/2026)
+
+test('motivo: No justificada / Justificada sale de la justificación; siempre 8 horas', () => {
+  const { db, ids } = crearEscenario();
+  const [no] = faltas.crear(db, { docenteId: ids.maria, fechas: [LUNES], asignaturaIds: [db.prepare("SELECT id FROM asignaturas WHERE crn = '16001'").get().id] }).faltas;
+  assert.deepEqual([no.motivo, no.justificacion, no.horasTexto, no.montoDescuento], ['Falta por asunto personal', 'ninguna', '8 horas= 1 día completo', 54]);
+  const [si] = faltas.crear(db, { docenteId: ids.maria, fechas: [MIERCOLES], justificacion: 'incapacidad_imss', folioImss: 'UW1' }).faltas;
+  assert.deepEqual([si.motivo, si.montoDescuento], ['Falta justificada', 0]);
+  // Ya no hay medio día
+  assert.throws(() => faltas.crear(db, { docenteId: ids.maria, fechas: [VIERNES], horasTexto: '4 horas= 1/2 día' }),
+    (e) => e.status === 400 && e.details.some((x) => x.campo === 'horasTexto'));
+});
+
+test('viaje escolar: es justificada, no pide folio, no se descuenta y lleva sus textos de Detalle', () => {
+  const { db, ids } = crearEscenario();
+  const r = faltas.crear(db, { docenteId: ids.maria, fechas: [LUNES], justificacion: 'viaje_escolar', folioImss: 'NO-SE-GUARDA' });
+  assert.ok(r.faltas.length > 0);
+  for (const f of r.faltas) {
+    assert.deepEqual([f.justificacion, f.motivo, f.folioImss, f.montoDescuento], ['viaje_escolar', 'Falta justificada', null, 0]);
+  }
+  const fila = db.prepare('SELECT situacion, estatus FROM faltas WHERE id = ?').get(r.faltas[0].id);
+  assert.deepEqual(fila, { situacion: 'No se hace descuento correspondiente por viaje escolar',
+    estatus: 'No se descuenta y no se toma la falta correspondiente (viaje escolar).' });
+});
+
+test('editar: pasar de No justificada a Justificada (y al revés) ajusta motivo, folio y descuento', () => {
+  const { db, ids } = crearEscenario();
+  const [f] = faltas.crear(db, { docenteId: ids.maria, fechas: [LUNES] }).faltas;
+  assert.throws(() => faltas.actualizar(db, f.id, { justificacion: 'cita_imss' }), (e) => e.status === 400);   // IMSS sin folio
+  const viaje = faltas.actualizar(db, f.id, { justificacion: 'viaje_escolar' });
+  assert.deepEqual([viaje.motivo, viaje.montoDescuento, viaje.folioImss], ['Falta justificada', 0, null]);
+  const otraVez = faltas.actualizar(db, f.id, { justificacion: 'ninguna' });
+  assert.deepEqual([otraVez.motivo, otraVez.montoDescuento], ['Falta por asunto personal', f.montoDescuento]);
+});

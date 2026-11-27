@@ -10,7 +10,8 @@ const express = require('express');
 const db = require('./lib/db');
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+// PORT=0 pide un puerto libre al sistema (lo usa la app de escritorio).
+const PORT = process.env.PORT !== undefined && process.env.PORT !== '' ? Number(process.env.PORT) : 3000;
 const HOST = process.env.HOST || '127.0.0.1';
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
@@ -72,7 +73,7 @@ app.use((err, req, res, next) => {
 });
 
 const server = app.listen(PORT, HOST, () => {
-  console.log(`✔ SIDI listo en http://localhost:${PORT}`);
+  console.log(`✔ SIDI listo en http://localhost:${server.address().port}`);
   console.log(`  Base de datos: ${db.DB_PATH}`);
 });
 
@@ -85,3 +86,5 @@ function shutdown() {
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+
+module.exports = { app, server, db };

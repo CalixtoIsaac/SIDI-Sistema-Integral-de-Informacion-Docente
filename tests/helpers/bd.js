@@ -1,6 +1,7 @@
 /**
  * BD SQLite en memoria para las pruebas de servicios.
- * Usa lib/migraciones/001_inicial.sql si ya existe; si no, el DDL de context/04_Modelo_Datos.md §4.
+ * Usa todas las migraciones de lib/migraciones/ (001, 002, 003…) en orden; si no hay, el DDL de
+ * context/04_Modelo_Datos.md §4.
  */
 const fs = require('fs');
 const path = require('path');
@@ -9,8 +10,9 @@ const Database = require('better-sqlite3');
 const RAIZ = path.join(__dirname, '..', '..');
 
 function ddl() {
-  const migracion = path.join(RAIZ, 'lib', 'migraciones', '001_inicial.sql');
-  if (fs.existsSync(migracion)) return fs.readFileSync(migracion, 'utf8');
+  const dir = path.join(RAIZ, 'lib', 'migraciones');
+  const archivos = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /^\d+_.+\.sql$/.test(f)).sort() : [];
+  if (archivos.length) return archivos.map((f) => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n');
   const doc = fs.readFileSync(path.join(RAIZ, 'context', '04_Modelo_Datos.md'), 'utf8');
   const seccion = doc.slice(doc.indexOf('## 4. DDL'));
   const m = seccion.match(/```sql\r?\n([\s\S]*?)```/);
@@ -35,13 +37,15 @@ const CATALOGOS = [
   ['cuenta_cargo', '5420103000', 'académico', 1], ['cuenta_cargo', '5422101001', 'VSPP', 2],
   ['motivo_falta', 'Falta por asunto personal', null, 1], ['motivo_falta', 'Falta injustificadas', null, 2],
   ['motivo_falta', 'Suspensión', null, 3],
-  ['horas_falta', '8 horas= 1 día completo', null, 1], ['horas_falta', '4 horas= 1/2 día', null, 2],
+  ['horas_falta', '8 horas= 1 día completo', null, 1],
   ['situacion', 'Se hace descuento correspondiente por permiso personal sin justificación.', 'ninguna', 1],
   ['situacion', 'No se hace descuento correspondiente por incapacidad del IMSS', 'incapacidad_imss', 2],
   ['situacion', 'No se hace descuento correspondiente por cita médica IMSS', 'cita_imss', 3],
+  ['situacion', 'No se hace descuento correspondiente por viaje escolar', 'viaje_escolar', 4],
   ['estatus_falta', 'Se descuenta y se toma la falta correspondiente.', 'ninguna', 1],
   ['estatus_falta', 'No se descuenta y no se toma la falta correspondiente.', 'incapacidad_imss', 2],
   ['estatus_falta', 'No se descuenta y no se toma la falta/permiso con goce correspondiente.', 'cita_imss', 3],
+  ['estatus_falta', 'No se descuenta y no se toma la falta correspondiente (viaje escolar).', 'viaje_escolar', 4],
 ];
 
 function crearBd() {

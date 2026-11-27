@@ -310,7 +310,7 @@ function poblar(db, archivos = generarArchivos()) {
   const conClaseEl = (n, letra) => archivos.gruposAgo.grupos.some((g) => g.docente === n && g.dias.includes(letra));
   const crearFaltas = (n, letra, extra, dias) => {
     if (!conClaseEl(n, letra)) return [];
-    return faltasService.crear(db, { docenteId: idDe(db, n), fechas: [dias[letra]], motivo: 'Falta por asunto personal', ...extra }).faltas;
+    return faltasService.crear(db, { docenteId: idDe(db, n), fechas: [dias[letra]], ...extra } /* motivo: sale de la justificación */).faltas;
   };
   const faltasDe = (n) => db.prepare('SELECT id, asignatura_id, fecha FROM faltas WHERE docente_id = ? ORDER BY fecha, id').all(idDe(db, n));
   const sinContrato = new Set(archivos.contratos.sinContrato.map((crn) => db.prepare(
@@ -353,6 +353,7 @@ function poblar(db, archivos = generarArchivos()) {
   registrar(11, 'L', {}); // English II: 5 h en inglés → otra tarifa ($106)
   registrar(5, 'J', { justificacion: 'incapacidad_imss', folioImss: 'DEMO0001' });
   registrar(12, 'V', { justificacion: 'cita_imss', folioImss: 'DEMO0002' });
+  registrar(9, 'L', { justificacion: 'viaje_escolar', observaciones: 'Acompaña viaje escolar (demo).' });
   registrar(4, 'X', {});
 
   // 5) Suplencias de noviembre con los servicios reales (HU-22 disponibles + HU-10 suplencias)
