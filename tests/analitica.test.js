@@ -202,7 +202,7 @@ test('G4: cambio por docente entre dos semestres, solo quienes tienen muestra en
   assert.deepEqual(a.cambioOpina(db, { periodoId: antes }).docentes, [], 'sin semestre anterior con OPINA');
 });
 
-test('G9: faltas en 2 tipos, del semestre por CRN o por fecha', () => {
+test('G9: faltas en 3 tipos (asunto personal, incapacidad médica, viaje escolar), del semestre por CRN o por fecha', () => {
   const db = baseConSemillas();
   const actual = idPeriodo(db, 'AGO-DIC 2026');
   const d1 = docente(db);
@@ -212,6 +212,7 @@ test('G9: faltas en 2 tipos, del semestre por CRN o por fecha', () => {
   falta(db, { docenteId: d1, asignaturaId: crn, fecha: '2026-09-08', monto: 54 });
   falta(db, { docenteId: d2, fecha: '2026-10-01', justificacion: 'incapacidad_imss' });  // sin CRN: por fecha
   falta(db, { docenteId: d2, fecha: '2026-10-02', justificacion: 'cita_imss' });
+  falta(db, { docenteId: d1, fecha: '2026-10-05', justificacion: 'viaje_escolar' });
   falta(db, { docenteId: d2, fecha: '2026-03-02' });                                      // otro semestre
 
   const g9 = a.faltasPorTipo(db);
@@ -219,10 +220,11 @@ test('G9: faltas en 2 tipos, del semestre por CRN o por fecha', () => {
   assert.deepEqual(g9.tipos, [
     { tipo: 'Asunto personal', faltas: 2, docentes: 1 },
     { tipo: 'Incapacidad médica', faltas: 2, docentes: 1 },
+    { tipo: 'Viaje escolar', faltas: 1, docentes: 1 },
   ]);
   const otro = a.faltasPorTipo(db, { periodoId: idPeriodo(db, 'ENE-MAY 2026') });
   assert.equal(otro.tipos[0].faltas, 1);
-  assert.deepEqual(a.faltasPorTipo(db, { periodoId: idPeriodo(db, 'AGO-DIC 2025') }).tipos.map((t) => t.faltas), [0, 0]);
+  assert.deepEqual(a.faltasPorTipo(db, { periodoId: idPeriodo(db, 'AGO-DIC 2025') }).tipos.map((t) => t.faltas), [0, 0, 0]);
 });
 
 test('G10: descontado vs. pagado a suplentes por quincena de reporte; lo pendiente no entra', () => {
@@ -304,7 +306,7 @@ test('sin datos: cada gráfica devuelve vacío o ceros, nunca datos de ejemplo',
   assert.deepEqual(a.distribucionOpina(db), []);
   assert.deepEqual(a.topBottomOpina(db), { periodoId: null, periodo: null, top: [], bottom: [] });
   assert.deepEqual(a.cambioOpina(db).docentes, []);
-  assert.deepEqual(a.faltasPorTipo(db).tipos.map((t) => t.faltas), [0, 0]);
+  assert.deepEqual(a.faltasPorTipo(db).tipos.map((t) => t.faltas), [0, 0, 0]);
   assert.deepEqual(a.descontadoVsPagado(db).totales, { descontado: 0, pagado: 0, diferencia: 0 });
   assert.ok(a.plantillaPorSemestre(db).every((p) => p.activos === 0 && p.bajas === 0));
   assert.deepEqual(a.perfilDocentes(db).estudiando, { si: 0, no: 0, porNivel: [] });

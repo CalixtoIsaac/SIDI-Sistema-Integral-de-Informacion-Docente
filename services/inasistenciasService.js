@@ -10,20 +10,25 @@
  * - profesores     = docentes distintos que faltaron
  * Semestre de una falta: el periodo de su CRN; si no tiene CRN, el periodo de su fecha, de la fecha de
  * pago de su quincena o del día en que se registró (en ese orden).
- * Tipo de resumen: incapacidad/cita IMSS → 'Incapacidad médica'; lo demás → 'Asunto personal'.
+ * Tipo de resumen: incapacidad/cita IMSS → 'Incapacidad médica'; viaje escolar → 'Viaje escolar';
+ * lo demás → 'Asunto personal'.
  */
 const { HttpError } = require('../lib/errores');
 const { nombreCompleto } = require('../lib/nombres');
 
-const TIPOS = ['Asunto personal', 'Incapacidad médica'];
+const TIPOS = ['Asunto personal', 'Incapacidad médica', 'Viaje escolar'];
 const JUSTIFICACIONES = [
   ['ninguna', 'Sin justificación (se descuenta)'],
   ['incapacidad_imss', 'Incapacidad IMSS'],
   ['cita_imss', 'Cita médica IMSS'],
+  ['viaje_escolar', 'Viaje escolar'],
 ];
 
 const redondear = (n) => Math.round(n * 100) / 100;
-const tipoResumen = (justificacion) => (['incapacidad_imss', 'cita_imss'].includes(justificacion) ? TIPOS[1] : TIPOS[0]);
+const tipoResumen = (justificacion) => {
+  if (['incapacidad_imss', 'cita_imss'].includes(justificacion)) return TIPOS[1];
+  return justificacion === 'viaje_escolar' ? TIPOS[2] : TIPOS[0];
+};
 
 function elegirPeriodo(db, periodoId) {
   if (periodoId === undefined || periodoId === null || periodoId === '') {

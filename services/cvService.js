@@ -24,8 +24,7 @@ const titulosService = require('./titulosService');
 const edicionService = require('./docentesEdicionService');
 
 const previews = crearAlmacen('CV');
-const RAIZ = path.join(__dirname, '..');
-const CARPETA_CV = path.join(RAIZ, 'data', 'cv');
+const { CARPETA_CV } = require('../lib/rutas');
 const MAX_PDF_MB = 10;
 
 function sha256(buffer) {

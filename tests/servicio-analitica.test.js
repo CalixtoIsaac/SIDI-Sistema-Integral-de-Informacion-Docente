@@ -66,10 +66,10 @@ test('perfil de docentes: género, nivel de estudios, campo de formación y rang
   assert.throws(() => analitica.perfilDocentes(db, { activo: 'quizas' }), (e) => e.status === 400);
 });
 
-test('faltas por motivo del semestre (con los 2 tipos de G9 aunque no haya faltas)', () => {
+test('faltas por motivo del semestre (con los 3 tipos de G9 aunque no haya faltas)', () => {
   const { db } = escenario();
   const r = analitica.faltasPorMotivo(db, {});
-  assert.deepEqual([r.total, r.porMotivo, r.porTipo.map((t) => t.tipo)], [0, [], ['Asunto personal', 'Incapacidad médica']]);
+  assert.deepEqual([r.total, r.porMotivo, r.porTipo.map((t) => t.tipo)], [0, [], ['Asunto personal', 'Incapacidad médica', 'Viaje escolar']]);
 });
 
 test('cumpleaños del mes: solo activos, por día, con edad que cumplen y si es hoy', () => {

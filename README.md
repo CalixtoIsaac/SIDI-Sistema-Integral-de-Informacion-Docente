@@ -44,7 +44,31 @@ Los cambios en `public/` no requieren reiniciar: basta con recargar el navegador
 | **Perfil** | Nombre, color principal con validación de contraste y modo claro/oscuro/automático (HU-17). |
 
 
-## 4. Estructura
+## 4. Instalador de Windows (app de escritorio)
+
+La coordinadora usa SIDI como programa de Windows (Electron): `electron/main.js` arranca el mismo `server.js` en `127.0.0.1` y lo muestra en su propia ventana. Sus datos (`app.db` y los CV) se guardan en `%APPDATA%\SIDI\data`, así que **instalar una versión nueva no borra nada**.
+
+**Requisitos (una vez):** `npm install` y NSIS (`winget install NSIS.NSIS`).
+
+**Para sacar una versión nueva:**
+
+1. Sube `version` en `package.json` (p. ej. `1.0.1` → `1.0.2`).
+2. `npm run dist` → genera `dist/SIDI-Setup-<versión>.exe` (tarda unos minutos la primera vez porque descarga Electron).
+3. Publica el instalador como *Release* de GitHub (no como commit: pesa ~120 MB):
+   ```bash
+   gh release create v1.0.2 dist/SIDI-Setup-1.0.2.exe --target main --title "SIDI 1.0.2" --notes "Qué cambió"
+   ```
+4. En la computadora de la coordinadora se ejecuta el instalador nuevo encima del anterior (cierra SIDI si está abierto).
+
+| Archivo | Para qué |
+|---|---|
+| `electron/main.js` | Ventana de la app, puerto libre, carpeta de datos y menú (Alt). |
+| `lib/rutas.js` | Carpeta de datos: `data/` en desarrollo, `%APPDATA%\SIDI\data` en la app instalada. |
+| `scripts/empaquetar.js` | Arma `build/win-unpacked` (Electron 42 + código + dependencias) y llama a NSIS. |
+| `installer/sidi.nsi` | Instalador en español, por usuario, en `%LOCALAPPDATA%\Programs\SIDI`. |
+| `build/icon.png`, `build/icon.ico` | Icono de la ventana, de `SIDI.exe` y del instalador. |
+
+## 5. Estructura
 
 ```
 server.js                 # Express: cabeceras, rutas /api y la página
@@ -60,7 +84,7 @@ data/                     # app.db y cv/*.pdf (no se suben a git)
 context/                  # documentación del proyecto
 ```
 
-## 5. Reglas del equipo
+## 6. Reglas del equipo
 
 - Flujo Git, commits y PR: `context/03_Arquitectura_Convenciones.md` §5–§7 (PR diario a `develop`, solo Isaac aprueba).
 - **Nunca** subir archivos reales del cliente (Excel, CV) ni `data/`.

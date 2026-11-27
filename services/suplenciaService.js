@@ -1,10 +1,11 @@
 /**
  * Suplencias y pago del suplente (HU-10; 04 §5; 07 §4.1; 06 PUT/DELETE /faltas/:id/suplencia).
  *
- *   suplencias.monto  = lo descontado al titular (siempre igual); en faltas IMSS (descuento 0) se
+ *   suplencias.monto  = lo descontado al titular (siempre igual); en faltas justificadas (descuento 0) se
  *                       paga igual la tarifa del día
- *   contrato          = uno de los contratos del SUPLENTE (se propone el primero del periodo; 422 si no es
- *                       suyo; vacío con aviso si no tiene)
+ *   contrato          = lo captura la coordinadora (no viene en los archivos): se propone el primero de los
+ *                       grupos del suplente o el último que se le capturó; se acepta cualquier número
+ *                       (solo dígitos); vacío con aviso si no tiene
  *   incidencia        = 'Flex Act. Acad de Apoyo' · 'B2_Cap.Profr(CADI Asore, Compet.)' · CeCo de la falta ·
  *                       1 periodo · detalle 'Sustituyó al docente …'
  *   agrupación        = mismo suplente + contrato + titular + CRN + mes + quincena + monto por día → 1 incidencia
@@ -30,17 +31,26 @@ function falta(db, faltaId) {
   return f;
 }
 
-/** Lo que se le paga al suplente por esa falta: lo descontado; si no hubo descuento (IMSS), la tarifa. */
+/** Lo que se le paga al suplente por esa falta: lo descontado; si no hubo descuento (justificada), la tarifa. */
 function montoDe(f) {
   return d.redondear(f.monto_descuento > 0 ? f.monto_descuento : f.tarifa_aplicada ?? f.monto_descuento ?? 0);
 }
 
-/** Contratos del docente (de sus asignaturas): primero los del periodo indicado. */
+/**
+ * Contratos conocidos del docente para proponer: los de sus asignaturas (primero los del periodo
+ * indicado) y después los que ya se le capturaron a mano en pagos de suplencias (el más reciente primero).
+ */
 function contratosDe(db, docenteId, periodoId = null) {
-  return db.prepare(`SELECT a.num_contrato AS contrato, MAX(a.periodo_id IS @periodo) AS delPeriodo, MIN(a.crn) AS crn
+  const deGrupos = db.prepare(`SELECT a.num_contrato AS contrato, MAX(a.periodo_id IS @periodo) AS delPeriodo, MIN(a.crn) AS crn
                      FROM asignaturas a WHERE a.docente_id = @docente AND a.num_contrato IS NOT NULL
                      GROUP BY a.num_contrato ORDER BY delPeriodo DESC, crn`)
     .all({ docente: docenteId, periodo: periodoId }).map((c) => ({ contrato: c.contrato, delPeriodo: c.delPeriodo === 1, crn: c.crn }));
+  const vistos = new Set(deGrupos.map((c) => c.contrato));
+  const capturados = db.prepare(`SELECT num_contrato AS contrato FROM incidencias
+                                 WHERE docente_id = ? AND origen = 'suplencia' AND num_contrato IS NOT NULL
+                                 GROUP BY num_contrato ORDER BY MAX(id) DESC`).all(docenteId)
+    .filter((c) => !vistos.has(c.contrato)).map((c) => ({ contrato: c.contrato, delPeriodo: false, crn: null }));
+  return [...deGrupos, ...capturados];
 }
 
 /** Valida el suplente y el contrato; devuelve { suplente, contrato, avisos }. */
@@ -52,12 +62,12 @@ function validarSuplente(db, f, docenteSuplenteId, numContrato) {
   if (suplente.activo === 0) avisos.push('SUPLENTE_INACTIVO');
   const recontratable = db.prepare('SELECT recontratable FROM docente_bajas WHERE docente_id = ? ORDER BY fecha DESC, id DESC LIMIT 1').get(suplente.id);
   if (recontratable?.recontratable === 0) avisos.push('SUPLENTE_NO_RECONTRATABLE');
-  const suyos = contratosDe(db, suplente.id, f.periodo_id);
   let contrato = numContrato === undefined || numContrato === null || String(numContrato).trim() === '' ? null : String(numContrato).trim();
-  if (contrato && !suyos.some((c) => c.contrato === contrato)) {
-    throw new HttpError(422, `El contrato ${contrato} no es del suplente.`, 'CONTRATO_NO_ES_DEL_SUPLENTE', suyos);
+  // El contrato del suplente lo captura la coordinadora a mano: basta con que sea un número.
+  if (contrato && !/^\d{1,15}$/.test(contrato)) {
+    throw new HttpError(422, 'El contrato del suplente solo lleva números (máx. 15).', 'CONTRATO_INVALIDO');
   }
-  if (!contrato) contrato = suyos[0]?.contrato ?? null;
+  if (!contrato) contrato = contratosDe(db, suplente.id, f.periodo_id)[0]?.contrato ?? null;
   if (!contrato) avisos.push('SUPLENTE_SIN_CONTRATO');
   return { suplente, contrato, avisos };
 }
@@ -68,6 +78,7 @@ function notas(faltas) {
     if (f.observaciones) return f.observaciones;
     if (f.justificacion === 'incapacidad_imss') return `Incapacidad IMSS${f.folio_imss ? ` folio ${f.folio_imss}` : ''}`;
     if (f.justificacion === 'cita_imss') return `Cita médica IMSS${f.folio_imss ? ` folio ${f.folio_imss}` : ''}`;
+    if (f.justificacion === 'viaje_escolar') return 'Viaje escolar';
     return null;
   }).filter(Boolean);
   return [...new Set(partes)].join('. ') || null;
@@ -166,10 +177,8 @@ function asignar(db, faltaId, datos = {}) {
 function sincronizarFalta(db, faltaId) {
   const s = db.prepare('SELECT * FROM suplencias WHERE falta_id = ?').get(faltaId);
   if (!s) return;
-  let contrato = s.incidencia_id ? db.prepare('SELECT num_contrato FROM incidencias WHERE id = ?').get(s.incidencia_id)?.num_contrato : null;
-  // Si el contrato guardado ya no es del suplente (p. ej. se volvió a importar el Excel de grupos o de
-  // contratos), no se detiene todo: se toma el contrato vigente del suplente (o queda sin contrato con aviso).
-  if (contrato && !contratoVigente(db, s.docente_suplente_id, contrato)) contrato = null;
+  // Se conserva el contrato guardado: lo capturó la coordinadora (si no había, se propone uno).
+  const contrato = s.incidencia_id ? db.prepare('SELECT num_contrato FROM incidencias WHERE id = ?').get(s.incidencia_id)?.num_contrato : null;
   asignar(db, faltaId, { docenteSuplenteId: s.docente_suplente_id, numContrato: contrato });
 }
 

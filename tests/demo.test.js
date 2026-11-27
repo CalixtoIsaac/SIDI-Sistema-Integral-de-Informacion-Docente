@@ -157,7 +157,7 @@ test('resumen ejecutivo: las 8 gráficas tienen datos con la demo (ninguna queda
   const g4 = analitica.cambioOpina(db);
   assert.ok(g4.docentes.length >= 10, 'G4: docentes en ambos semestres');
   assert.ok(g4.docentes.some((d) => d.cambio > 0) && g4.docentes.some((d) => d.cambio < 0), 'G4: unos suben y otros bajan');
-  assert.ok(analitica.faltasPorTipo(db).tipos.every((t) => t.faltas > 0), 'G9: los 2 tipos');
+  assert.ok(analitica.faltasPorTipo(db).tipos.every((t) => t.faltas > 0), 'G9: los 3 tipos');
   const g10 = analitica.descontadoVsPagado(db);
   assert.deepEqual(g10.quincenas.map((q) => q.quincena), ['Q19', 'Q20'], 'G10: solo lo reportado');
   assert.ok(g10.quincenas.every((q) => q.descontado > 0 && q.pagado > 0));

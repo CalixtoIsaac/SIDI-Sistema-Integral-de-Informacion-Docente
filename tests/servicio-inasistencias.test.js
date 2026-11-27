@@ -34,7 +34,7 @@ test('indicadores del semestre actual: faltas, días, profesores, descontado y p
   assert.deepEqual(r.indicadores, { faltas: 5, diasFaltados: 17, profesores: 3, montoDescontado: 714, pagadoSuplentes: 65, cubiertas: 1 });
 });
 
-test('desglose por motivo, por justificación y por tipo de resumen (2 tipos)', () => {
+test('desglose por motivo, por justificación y por tipo de resumen (3 tipos)', () => {
   const { db } = escenario();
   const r = resumenSemestral(db);
   assert.deepEqual(r.porMotivo, [
@@ -42,10 +42,11 @@ test('desglose por motivo, por justificación y por tipo de resumen (2 tipos)', 
     { motivo: 'Falta injustificadas', faltas: 1, profesores: 1, montoDescontado: 500 },
   ]);
   assert.deepEqual(r.porJustificacion.map((j) => [j.justificacion, j.faltas, j.profesores, j.montoDescontado]),
-    [['ninguna', 4, 2, 714], ['incapacidad_imss', 1, 1, 0], ['cita_imss', 0, 0, 0]]);
+    [['ninguna', 4, 2, 714], ['incapacidad_imss', 1, 1, 0], ['cita_imss', 0, 0, 0], ['viaje_escolar', 0, 0, 0]]);
   assert.deepEqual(r.porTipo, [
     { tipo: 'Asunto personal', faltas: 4, profesores: 2, montoDescontado: 714 },
     { tipo: 'Incapacidad médica', faltas: 1, profesores: 1, montoDescontado: 0 },
+    { tipo: 'Viaje escolar', faltas: 0, profesores: 0, montoDescontado: 0 },
   ]);
 });
 
@@ -58,12 +59,12 @@ test('por docente: quién faltó, cuántas veces y por qué (más faltas primero
   ]);
 });
 
-test('otro semestre por periodoId; semestre sin faltas da ceros y los dos tipos; 404 si no existe', () => {
+test('otro semestre por periodoId; semestre sin faltas da ceros y los tres tipos; 404 si no existe', () => {
   const { db } = escenario();
   assert.deepEqual(resumenSemestral(db, { periodoId: '2' }).indicadores, { faltas: 1, diasFaltados: 1, profesores: 1, montoDescontado: 54, pagadoSuplentes: 0, cubiertas: 0 });
   const vacio = crearEscenario();
   const r = resumenSemestral(vacio.db);
   assert.deepEqual(r.indicadores, { faltas: 0, diasFaltados: 0, profesores: 0, montoDescontado: 0, pagadoSuplentes: 0, cubiertas: 0 });
-  assert.deepEqual(r.porTipo.map((t) => [t.tipo, t.faltas]), [['Asunto personal', 0], ['Incapacidad médica', 0]]);
+  assert.deepEqual(r.porTipo.map((t) => [t.tipo, t.faltas]), [['Asunto personal', 0], ['Incapacidad médica', 0], ['Viaje escolar', 0]]);
   assert.throws(() => resumenSemestral(db, { periodoId: 99 }), (e) => e.status === 404);
 });
