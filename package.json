@@ -1,6 +1,6 @@
 {
   "name": "plantilla-express-sqlite",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Plantilla base para proyectos web con Node.js, Express, SQLite y JavaScript sin frameworks.",
   "main": "server.js",
   "private": true,
