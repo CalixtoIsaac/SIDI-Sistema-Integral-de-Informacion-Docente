@@ -1,6 +1,6 @@
 # SIDI · Manual de usuario
 
-**Para:** Coordinación de Docentes, Preparatoria Tecmilenio campus Veracruz · **Versión de SIDI:** 1.0.1 · **Fecha:** 26/11/2026
+**Para:** Coordinación de Docentes, Preparatoria Tecmilenio campus Veracruz · **Versión de SIDI:** 1.0.3 · **Fecha:** 27/11/2026
 
 Este manual explica cómo usar SIDI día a día: consultar a los docentes, registrar faltas y suplencias, capturar pagos y descargar los reportes de Nacional. No necesitas conocimientos técnicos. Las imágenes usan **datos de demostración** (nombres y nóminas inventados).
 
@@ -27,10 +27,11 @@ Este manual explica cómo usar SIDI día a día: consultar a los docentes, regis
 
 ## 1. Abrir SIDI y conocer la pantalla
 
-1. Abre SIDI con el acceso directo del escritorio o del menú Inicio. Se abre directo en el **Panel**; no hay usuario ni contraseña.
+1. Abre SIDI con el acceso directo del escritorio o del menú Inicio. Se abre en su propia ventana, directo en el **Panel**; no hay usuario ni contraseña.
 2. A la izquierda está el **menú**: Panel, Docentes, Faltas, Incidencias, OPINA, Reportes y Configuración. Abajo, tu nombre lleva a **Perfil**.
 3. Arriba está el **buscador**: escribe un nombre, CURP, nómina (con o sin `L0`) o CRN y presiona Enter para ir al docente.
 4. El botón de luna/sol cambia entre modo claro y oscuro. El botón junto a "Panel" contrae el menú para ganar espacio.
+5. La tecla **Alt** muestra el menú de la ventana: **SIDI** (Abrir carpeta de datos, Salir) y **Ver** (Recargar, Acercar, Alejar, Pantalla completa).
 
 ![Panel administrativo](img/01_panel.png)
 
@@ -155,12 +156,15 @@ La pantalla muestra la quincena elegida con: pendientes de reportar, total desco
 2. **Docente:** escribe nombre, nómina, CURP o CRN y elígelo.
 3. **Día(s):** elige la fecha y **Agregar día** si faltó varios días.
 4. **CRN a los que faltó:** SIDI marca los grupos que el docente tiene ese día según su horario. Desmarca los que sí dio. Si un CRN tiene dos sesiones ese día y faltó a ambas, usa **+ 2ª sesión** (SIDI pide confirmar).
-5. **Motivo, horas de la falta, cuenta de cargo** (automática según la materia) y **ticket** opcional.
-6. **Justificación:** *Ninguna* (se descuenta), *Incapacidad IMSS* o *Cita IMSS* (no se descuenta y pide el folio).
-7. Revisa la **vista previa**: fecha, CRN, tarifa, descuento y el comentario que irá en el Excel. Puedes cambiar el descuento de un día; queda marcado como editado.
-8. **Guardar.**
+5. **Motivo:** *No justificada* (se registra como falta por asunto personal y se descuenta) o *Justificada*. Toda falta cuenta como **8 horas = 1 día completo**.
+6. **Si es Justificada,** elige la razón: *Incapacidad IMSS* o *Cita IMSS* (piden el folio) o *Viaje escolar*. No se descuenta, pero el suplente sí cobra la tarifa del día.
+7. **Cuenta de cargo** (automática según la materia) y **ticket** opcional.
+8. Revisa la **vista previa**: fecha, CRN, tarifa, descuento y el comentario que irá en el Excel. Puedes cambiar el descuento de un día; queda marcado como editado.
+9. **Guardar.**
 
 ![Registrar falta](img/11_registrar_falta.png)
+
+![Falta justificada por viaje escolar](img/11b_falta_justificada.png)
 
 Si un CRN no tiene contrato capturado, SIDI te lo pide en ese momento y lo guarda para siempre.
 
@@ -180,7 +184,7 @@ Los no recontratables aparecen al final con ⚠. **Ver todos** incluye a quienes
 
 También puedes asignarlo después: en la lista de faltas, botón **Asignar** en la columna *Cubrió*.
 
-Al asignar, SIDI crea el pago del suplente en Incidencias con el mismo monto, usa uno de **sus** contratos y agrupa los días del mismo grupo ("del 1 al 4 de septiembre, a pagar 4 días"). En faltas IMSS el suplente sí cobra.
+Al asignar, SIDI crea el pago del suplente en Incidencias con el mismo monto, agrupa los días del mismo grupo ("del 1 al 4 de septiembre, a pagar 4 días") y te pide el **contrato del suplente**: SIDI propone el de sus grupos (o el último que le capturaste) y puedes escribir otro, solo con números. Si lo dejas vacío, aparece como aviso en Reportes. En faltas justificadas el suplente sí cobra.
 
 ### 6.4 Editar o eliminar
 
@@ -212,9 +216,7 @@ Los pagos a suplentes aparecen aquí con 🔗 y se editan desde **Faltas**.
 1. Elige la **Quincena**.
 2. Cada tarjeta muestra qué entra: faltas, docentes y monto de Descuentos; pagos, suplencias e importe de Incidencias.
 3. **Revisar / quitar alguna** permite dejar una falta o un pago para la siguiente quincena.
-4. **Avisos antes de descargar:** si hay algo que corregir (CRN sin contrato, contrato que ya no es del suplente…), haz clic en **Corregir** junto al aviso; se abre el registro exacto.
-
-![Aviso con botón Corregir](img/E5_aviso_reportes.png)
+4. **Avisos antes de descargar:** si hay algo que corregir (CRN sin contrato, suplencia sin contrato…), haz clic en **Corregir** junto al aviso; se abre el registro exacto.
 
 ### 8.2 Descargar
 
@@ -283,6 +285,8 @@ Desde el Panel, **Resumen ejecutivo**. Es una presentación de 11 diapositivas a
 |---|---|---|---|
 | ![](img/14_resumen_kpis.png) | ![](img/15_resumen_g1.png) | ![](img/16_resumen_g9.png) | ![](img/18_resumen_hallazgos.png) |
 
+![G10 · Descontado vs. pagado a suplentes por quincena](img/17_resumen_g10.png)
+
 ---
 
 ## 11. Configuración
@@ -324,9 +328,9 @@ Destinatarios (Para, CC, CCO separados por `;`), asunto y cuerpo. Puedes usar va
 
 Todo lo que capturas está en un solo archivo de base de datos. Para respaldarlo:
 
-1. Con SIDI abierto, escribe en la barra de direcciones la misma dirección que ya aparece (por ejemplo `http://localhost:3000`) seguida de `/api/respaldo`, y presiona Enter.
-2. Se descarga `SIDI-respaldo-AAAA-MM-DD.db`.
-3. Guárdalo en una unidad institucional (OneDrive o carpeta de red de la escuela).
+1. En SIDI, presiona **Alt** → **SIDI** → **Abrir carpeta de datos**. Se abre la carpeta `%APPDATA%\SIDI\data`, con el archivo `app.db` y la carpeta `cv`.
+2. Cierra SIDI (**Alt** → **SIDI** → **Salir**) para que el archivo quede completo.
+3. Copia la carpeta `data` completa a una unidad institucional (OneDrive o carpeta de red de la escuela) y ponle la fecha en el nombre, por ejemplo `SIDI-respaldo-2026-11-30`.
 
 > **El respaldo contiene datos personales** (CURP, fechas de nacimiento, nóminas). No lo envíes por WhatsApp ni a correos personales.
 
@@ -347,6 +351,7 @@ Hazlo al menos al cerrar cada quincena.
 | Outlook no abre el `.eml` como borrador | Usa **Usar mi programa de correo** (8.3) |
 | Me equivoqué en una falta de una quincena ya cerrada | **Reabrir quincena**, corrige, vuelve a descargar y cierra |
 | El CV no se leyó bien | Corrige en la vista previa o captura el dato en **Editar** |
-| La pantalla se ve sin estilos o en blanco | Recarga con F5; si sigue, cierra y abre SIDI de nuevo |
+| La pantalla se ve sin estilos o en blanco | **Alt** → **Ver** → **Recargar**; si sigue, cierra y abre SIDI de nuevo |
+| No aparece la opción *Viaje escolar* | Tienes una versión anterior a la 1.0.2: instala la más reciente desde *Releases* |
 
-**Soporte:** Matías Hernández Garrido, desarrollador de SIDI · [al03035629@tecmilenio.mx](mailto:al03035629@tecmilenio.mx)
+**Soporte:** Equipo SIDI: Matías Hernández Garrido (desarrollador backend) y Calixto Isaac Galeana Medrano (Scrum Master).

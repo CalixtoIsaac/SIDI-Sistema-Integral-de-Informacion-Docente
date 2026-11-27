@@ -1,10 +1,10 @@
 # SIDI · Manual técnico
 
-**Para:** quien instala, mantiene o amplía SIDI · **Versión:** 1.0.1 (código: rama `develop`, commit `800e561`) · **Fecha:** 26/11/2026
+**Para:** quien instala, mantiene o amplía SIDI · **Versión:** 1.0.3 del instalador (código 1.0.2: rama `develop`, commit `5b72c44`, igual a `main`) · **Fecha:** 27/11/2026
 
 Este manual describe cómo está construido SIDI, cómo se instala y despliega, cómo se prueba y cómo se mantiene. La documentación de diseño completa está en `context/` (requerimientos, backlog, arquitectura, modelo de datos, UI/UX, API y formatos de Excel); este manual la resume y la actualiza con lo que quedó implementado.
 
-**Soporte:** Matías Hernández Garrido, desarrollador de SIDI · [al03035629@tecmilenio.mx](mailto:al03035629@tecmilenio.mx)
+**Soporte:** Equipo SIDI: Matías Hernández Garrido (desarrollador backend) y Calixto Isaac Galeana Medrano (Scrum Master).
 
 ---
 
@@ -37,7 +37,8 @@ SIDI es una aplicación web **local** de un solo usuario: un proceso Node.js sir
 
 | Componente | Versión (lockfile) | Uso |
 |---|---|---|
-| Node.js | ≥ 20 (recomendado 22 LTS) | Ejecución |
+| Node.js | ≥ 20 (recomendado 22 LTS) | Ejecución en desarrollo y para generar el instalador |
+| Electron | 42.11.18 (la descarga `scripts/empaquetar.js`) | Ventana de la app instalada; trae su propio Node, así que la computadora de la coordinación no necesita Node.js |
 | Express | 4.22.3 | Servidor HTTP y rutas |
 | better-sqlite3 | 12.11.1 | Base de datos SQLite (síncrona, una conexión) |
 | xlsx (SheetJS) | 0.20.3, desde `cdn.sheetjs.com` | Leer Excel de grupos, OPINA (`.xlsx`/`.xlsb`) y contratos; escribir el ranking |
@@ -46,6 +47,7 @@ SIDI es una aplicación web **local** de un solo usuario: un proceso Node.js sir
 | multer | 2.5.0 | Subida de archivos (en memoria) |
 | dotenv | 16.x | Variables de entorno |
 | pdf-lib (dev) | 1.17.x | Generar CV ficticios para las pruebas |
+| @electron/get, extract-zip, resedit, pe-library (dev) | — | Descargar Electron, ponerle ícono y versión al `.exe` al empaquetar |
 | `bcryptjs`, `jsonwebtoken` | — | **Sin uso**, heredadas de la plantilla; pendientes de quitar |
 
 Frontend: HTML + CSS + JavaScript sin frameworks ni compilación. Pruebas: `node:test`.
@@ -58,7 +60,8 @@ Frontend: HTML + CSS + JavaScript sin frameworks ni compilación. Pruebas: `node
 server.js                    Express: cabeceras, rutas /api, estáticos y errores
 lib/
   db.js                      conexión única, PRAGMAs, migraciones, semillas
-  migraciones/               001_inicial.sql, 002_indice_horarios.sql
+  migraciones/               001_inicial.sql, 002_indice_horarios.sql, 003_retro_sesion_cliente.sql
+  rutas.js                   carpeta de datos: <proyecto>/data o SIDI_DATA_DIR (app instalada)
   semillas.js                tarifas, catálogos, periodos, quincenas, configuración
   nomina.js curp.js quincena.js horario.js antiguedad.js periodos.js nombres.js validar.js color.js
   textoSuplencia.js          texto "Sustituyó al docente…" de Nacional
@@ -76,7 +79,11 @@ public/
   css/                       theme.css (tokens), base.css, app.css, sidi.css
   js/                        theme.js, ui-kit.js, sidi-comun.js, app.js, graficas.js y una vista por archivo
 templates/                   DESCUENTO-PREPA.xlsx, INCIDENCIAS-PREPA.xlsx (vacías, sin vínculos externos)
+electron/main.js             app de escritorio: una sola instancia, arranca server.js en 127.0.0.1 y un puerto libre, menú SIDI / Ver
+installer/sidi.nsi           instalador NSIS por usuario (sin administrador) en %LOCALAPPDATA%\Programs\SIDI
+build/                       icon.ico e icon.png de la app
 scripts/
+  empaquetar.js              npm run dist → dist/SIDI-Setup-<versión>.exe
   demo.js                    base de demostración data/demo.db + Excel ficticios en data/demo/
   comparar-reportes.js       compara los Excel generados con los originales Q16–Q20 (solo local)
   github/                    creación del tablero, issues y plantillas de GitHub
@@ -104,7 +111,8 @@ Abre `http://localhost:3000`. La primera vez se crea `data/app.db` con el esquem
 |---|---|
 | `npm start` | Ejecución normal |
 | `npm run dev` | Desarrollo (`node --watch`) |
-| `npm test` | 267 pruebas (`node --test`), ≈ 15 s |
+| `npm test` | 270 pruebas (`node --test`), ≈ 12 s |
+| `npm run dist` | Instalador de Windows `dist/SIDI-Setup-<versión>.exe` (en Windows, con NSIS instalado) |
 | `node scripts/demo.js [--reiniciar]` | Crea `data/demo.db` con datos ficticios y Excel en `data/demo/` |
 | `node scripts/comparar-reportes.js …` | Compara reportes generados con originales; imprime solo conteos, filas y CRN (nunca nombres ni nóminas) |
 
@@ -132,10 +140,11 @@ DB_PATH=data/demo.db npm start              # bash
 
 | Variable | Valor por defecto | Uso |
 |---|---|---|
-| `PORT` | `3000` | Puerto HTTP |
+| `PORT` | `3000` | Puerto HTTP. La app instalada usa `0` (el sistema da un puerto libre) |
 | `HOST` | `127.0.0.1` | Dirección de escucha. `0.0.0.0` lo abre a la red local: **no lo hagas** sin agregar inicio de sesión |
 | `NODE_ENV` | `development` | `production` en la instalación |
-| `DB_PATH` | `./data/app.db` | Ruta del archivo SQLite; la carpeta se crea si no existe |
+| `DB_PATH` | `<carpeta de datos>/app.db` | Ruta del archivo SQLite; la carpeta se crea si no existe |
+| `SIDI_DATA_DIR` | `./data` | Carpeta de datos (`app.db` y `cv/`). Electron la fija en `%APPDATA%\SIDI\data` |
 
 No hay secretos: SIDI no guarda contraseñas ni llaves de API.
 
@@ -161,6 +170,7 @@ Reglas de dominio que viven en el esquema:
 | Tarifa mensual | Columna generada `pago_semestre / 4` |
 | Baja con historial | `docente_bajas`; `docentes.recontratable` guarda la última |
 | Contrato por CRN | `asignaturas.num_contrato` |
+| Falta justificada | `faltas.justificacion` ∈ `ninguna`, `incapacidad_imss`, `cita_imss`, `viaje_escolar` (migración 003); `folio_imss` solo en las dos de IMSS |
 
 ---
 
@@ -179,7 +189,7 @@ Servicios principales:
 | `docentesService`, `filtrosDocentes`, `docentesEdicionService` | Tabla con los 12 campos, búsqueda multicampo, filtros, paginación, alta y edición |
 | `bajaService` | Baja con motivo, observaciones, recontratable y periodo |
 | `gruposService`, `cvService`, `contratosService`, `opinaService` | Importaciones con vista previa (`previewId`) y confirmación |
-| `faltasService`, `descuentoService` | Faltas por CRN/día/sesión, tarifa, IMSS, descuento manual |
+| `faltasService`, `descuentoService` | Faltas por CRN/día/sesión, siempre 8 horas = 1 día; motivo No justificada / Justificada (incapacidad IMSS, cita IMSS con folio, viaje escolar); tarifa; descuento manual |
 | `suplenciaService`, `disponiblesService` | Pago del suplente, agrupación de días, contrato del suplente; docentes sin empalme |
 | `incidenciasService` | Pagos adicionales, orden, copiar de la quincena anterior |
 | `reporteService`, `quincenasService`, `envioService` | Validación y generación de los Excel, cierre de quincena, borrador `.eml` y bitácora |
@@ -217,7 +227,18 @@ Toda importación tiene dos pasos: `POST …/preview` (multipart, campo `archivo
 
 ### 7.3 Marcar el semestre actual (sin botón en la interfaz)
 
-En la versión 1.0.1 no hay botón para cambiar el semestre actual. Mientras se agrega, se hace con la API desde PowerShell en la computadora de la coordinación, con SIDI abierto:
+En la versión 1.0.3 no hay botón para cambiar el semestre actual. Mientras se agrega, se hace con la API.
+
+**En la app instalada** (el puerto cambia en cada arranque): en SIDI, **Alt** → **Ver** → **Herramientas de desarrollo** → pestaña *Console*, y escribe:
+
+```js
+// 1. Ver los periodos y su id
+await (await fetch('/api/periodos')).json()
+// 2. Marcar el periodo con id 5 como actual (desmarca los demás)
+await fetch('/api/periodos/5', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: '{"actual": true}' })
+```
+
+**En desarrollo** (`npm start`, puerto 3000), desde PowerShell:
 
 ```powershell
 # 1. Ver los periodos y su id
@@ -226,7 +247,7 @@ Invoke-RestMethod http://localhost:3000/api/periodos | ConvertTo-Json -Depth 4
 Invoke-RestMethod -Method Put -Uri http://localhost:3000/api/periodos/5 -ContentType 'application/json' -Body '{"actual": true}'
 ```
 
-Si la versión instalada usa otro puerto, cambia `3000` por el que aparece en la barra de direcciones de SIDI.
+Después, **Alt** → **Ver** → **Recargar**.
 
 ---
 
@@ -268,7 +289,7 @@ node --test tests/servicio-faltas.test.js # un archivo
 node --test --test-reporter=spec          # salida legible
 ```
 
-- 38 archivos, **267 pruebas**, todas con datos ficticios.
+- 38 archivos, **270 pruebas**, todas con datos ficticios.
 - `tests/helpers/bd.js` crea una base SQLite en memoria con las migraciones reales; `helpers/excel.js` arma Excel de prueba; `helpers/cv.js` genera CV en PDF con `pdf-lib`; `helpers/escenario.js` arma docentes, grupos y horarios.
 - **Regla del equipo:** toda corrección de un error lleva una prueba que falla sin la corrección.
 
@@ -278,7 +299,7 @@ node --test --test-reporter=spec          # salida legible
 | Reglas puras (CURP, nómina, quincena, horario, antigüedad) | 30 |
 | Lectores (Excel de grupos, OPINA, CV) | 26 |
 | Docentes (consulta, filtros, edición, bajas, importación) | 50 |
-| Faltas, suplencias, disponibles e incidencias | 38 |
+| Faltas, suplencias, disponibles e incidencias | 41 |
 | Reportes de Nacional y correo | 24 |
 | OPINA, panel y resumen ejecutivo | 47 |
 
@@ -288,34 +309,47 @@ node --test --test-reporter=spec          # salida legible
 
 ## 11. Despliegue en la computadora de la coordinación
 
-**Instalador para Windows (recomendado).** Desde *Releases* del repositorio se publica `SIDI-Setup-<versión>.exe` (v1.0.0 y v1.0.1, 23/11/2026):
+**Instalador para Windows (recomendado).** Desde *Releases* del repositorio se publica `SIDI-Setup-<versión>.exe` (v1.0.0 a v1.0.3; la más reciente es la 1.0.3):
 
 | Característica | Valor |
 |---|---|
 | Sistema | Windows 10 u 11 de 64 bits |
-| Requiere Node.js | No: el instalador lo incluye |
+| Requiere Node.js | No: Electron trae su propio Node |
 | Requiere administrador | No |
-| Datos | Carpeta de SIDI en AppData del usuario; se conservan al actualizar y al desinstalar |
+| Programa | `%LOCALAPPDATA%\Programs\SIDI`, con accesos directos en escritorio y menú Inicio |
+| Datos | `%APPDATA%\SIDI\data` (`app.db` y `cv/`); se conservan al actualizar, reinstalar y desinstalar |
+| Puerto | Libre, elegido al arrancar, solo en `127.0.0.1`; abrir SIDI dos veces enfoca la ventana existente |
 | Firma digital | No (SmartScreen muestra advertencia: *Más información* → *Ejecutar de todas formas*) |
-| Herramienta de empaquetado | Lo genera el Scrum Master a partir de `main` y lo publica en *Releases* (v1.0.0 y v1.0.1) |
+| Herramienta de empaquetado | Electron 42.11.18 + NSIS, con `npm run dist` (ver abajo); el Scrum Master lo genera a partir de `main` y lo publica en *Releases* |
 
-**Actualizar:** descargar el instalador nuevo y ejecutarlo; las migraciones se aplican solas al arrancar y los datos se conservan. Antes de actualizar, **descarga un respaldo** (§12).
+**Generar el instalador** (en Windows, a partir de `main`):
+
+```powershell
+npm install
+winget install NSIS.NSIS        # una sola vez
+npm run dist                    # dist\SIDI-Setup-<versión>.exe
+```
+
+La versión del instalador sale de `package.json`. `scripts/empaquetar.js` descarga Electron, compila `better-sqlite3` para Electron, copia el código sin `data/` ni pruebas y llama a `makensis` con `installer/sidi.nsi`.
+
+**Actualizar:** descargar el instalador nuevo y ejecutarlo; las migraciones se aplican solas al arrancar y los datos se conservan. Antes de actualizar, **haz un respaldo** (§12).
 
 **Alternativa sin instalador:** instalar Node.js 22 LTS, copiar el repositorio, `npm install --omit=dev`, crear `.env` con `NODE_ENV=production` y un `DB_PATH` fuera de la carpeta del código, y crear un acceso directo a `npm start` y otro a `http://localhost:3000`.
 
 **Lista de verificación después de instalar o actualizar:**
 
-- [ ] `http://localhost:3000/api/health` responde `{"status":"online"}`.
-- [ ] El Panel carga sin errores en la consola del navegador (F12).
+- [ ] SIDI abre en su ventana y el Panel carga sin errores (**Alt** → **Ver** → **Herramientas de desarrollo** → *Console*).
+- [ ] En Faltas → Registrar falta aparece el motivo *Justificada* con la opción *Viaje escolar* (versión ≥ 1.0.2).
 - [ ] Configuración muestra las tarifas vigentes.
-- [ ] Se puede descargar un respaldo.
+- [ ] **Alt** → **SIDI** → **Abrir carpeta de datos** abre `%APPDATA%\SIDI\data` con `app.db`.
 - [ ] El `.eml` de prueba abre como borrador en el Outlook de la coordinadora.
 
 ---
 
 ## 12. Respaldo y restauración
 
-- **Respaldo:** `GET /api/respaldo` usa `db.backup()` (copia consistente aunque haya escrituras, incluye el WAL) y descarga `SIDI-respaldo-AAAA-MM-DD.db`. La copia temporal se borra al terminar la descarga.
+- **Respaldo en la app instalada:** **Alt** → **SIDI** → **Abrir carpeta de datos**, cerrar SIDI (**Alt** → **SIDI** → **Salir**) y copiar la carpeta `data` completa (`app.db` y `cv/`) a almacenamiento institucional, con la fecha en el nombre.
+- **Respaldo por API (desarrollo):** `GET /api/respaldo` usa `db.backup()` (copia consistente aunque haya escrituras, incluye el WAL) y descarga `SIDI-respaldo-AAAA-MM-DD.db`. La copia temporal se borra al terminar la descarga.
 - **Restaurar:** cerrar SIDI, renombrar el archivo actual (por ejemplo `app.db.anterior`), copiar el respaldo con el nombre `app.db` en la carpeta de datos y abrir SIDI. Borra también `app.db-wal` y `app.db-shm` si existen.
 - El respaldo contiene datos personales: guárdalo solo en almacenamiento institucional.
 
@@ -361,9 +395,9 @@ feature/hu-XX-descripcion, fix/descripcion   (desde develop)
 | Agregar un grupo a omitir (otro grupo en línea) | Configuración → Grupos que se omiten, o `grupos.omitir_grupos` |
 | Cambiar destinatarios de Nacional | Configuración → Correo a Nacional |
 | Iniciar semestre | Importar Excel de grupos, marcar el semestre actual (§7.3), subir contratos |
-| Agregar una columna a la BD | Nueva migración `lib/migraciones/003_….sql` + prueba en `tests/db.test.js` |
+| Agregar una columna a la BD | Nueva migración `lib/migraciones/004_….sql` + prueba en `tests/db.test.js`; para cambiar un `CHECK`, reconstruir la tabla como en la 003 (respaldando antes las tablas hijas con `ON DELETE CASCADE`) |
 | Probar con datos ficticios | `node scripts/demo.js --reiniciar` y `DB_PATH=data/demo.db` |
-| Publicar versión | PR de `develop` a `main`, etiqueta `vX.Y.Z`, generar instalador, *Release* con notas |
+| Publicar versión | Subir `version` en `package.json`, PR de `develop` a `main`, etiqueta `vX.Y.Z`, `npm run dist`, *Release* con el `.exe` y notas |
 
 ---
 
@@ -376,6 +410,7 @@ feature/hu-XX-descripcion, fix/descripcion   (desde develop)
 | `EADDRINUSE :3000` | Otra instancia de SIDI abierta | Cerrarla o cambiar `PORT` |
 | Pruebas fallan con "No se encontró el DDL" | Versión anterior a `c85ae64` con saltos de línea CRLF | Actualizar `develop` |
 | Excel generado pide "actualizar vínculos" | Plantilla con `externalLinks/` | Usar la plantilla vacía del repositorio |
-| Descarga de reporte con aviso de contrato | Contrato del suplente ya no es suyo tras reimportar | Botón *Corregir* en Reportes |
+| Aviso "Suplencia sin contrato del suplente" en Reportes | No se capturó el contrato del suplente al asignarlo | Botón *Corregir* en Reportes y escribir el contrato (solo números) |
+| SIDI no abre: "SIDI no pudo iniciar" | Base dañada o carpeta de datos sin permisos | El mensaje muestra la carpeta de datos; restaurar el último respaldo (§12) |
 | Outlook no abre el `.eml` como borrador | Versión de Outlook | Usar *Usar mi programa de correo* (`mailto`) |
 | Windows pregunta si borrar carpetas durante `git pull` | Repositorio dentro de OneDrive | Responder **n** y pausar la sincronización |

@@ -6,14 +6,16 @@
 
 **Cliente:** Coordinación de Docentes, Preparatoria Tecmilenio campus Veracruz
 
-**Repositorio:** [github.com/CalixtoIsaac/SIDI-Sistema-Integral-de-Informacion-Docente](https://github.com/CalixtoIsaac/SIDI-Sistema-Integral-de-Informacion-Docente) · versión evaluada: rama `develop`, commit `800e561` · instalador **v1.0.1** (23/11/2026)
+**Repositorio:** [github.com/CalixtoIsaac/SIDI-Sistema-Integral-de-Informacion-Docente](https://github.com/CalixtoIsaac/SIDI-Sistema-Integral-de-Informacion-Docente) · versión evaluada: rama `develop`, commit `5b72c44` (mismo código que `main`) · instalador **v1.0.3**
 
-| Rol (Scrum) | Integrante | Matrícula |
-|---|---|---|
-| Product Owner | Saraí Cecilio Rascón | AL03056499 |
-| Scrum Master y frontend | Calixto Isaac Galeana Medrano | AL07205504 |
-| Backend y frontend | Matías Hernández Garrido | AL03035629 |
-| Base de datos y estructura | Uziel Armando García Duarte | AL07173561 |
+| Rol (Scrum) | Integrante |
+|---|---|
+| Product Owner | Saraí Cecilio Rascón |
+| Scrum Master y frontend | Calixto Isaac Galeana Medrano |
+| Backend | Matías Hernández Garrido |
+| Base de datos y estructura | Uziel Armando García Duarte |
+
+Integrante original: Sebastián Huesca Ramírez (frontend), quien salió del proyecto durante el desarrollo; el Scrum Master asumió el frontend.
 
 ---
 
@@ -21,7 +23,7 @@
 
 **SIDI convierte el reporte quincenal de faltas y suplencias de la Coordinación de Docentes en un proceso calculado, validado y trazable, y reúne en una sola aplicación la información de los 47 docentes del campus.** Antes, la coordinadora juntaba datos de varios archivos, calculaba a mano el descuento de cada falta y llenaba dos Excel con formato fijo para Nacional. En los cinco reportes reales que nos entregó (quincenas Q16 a Q20) el equipo encontró **24 inconsistencias de captura o de formato**, 13 de ellas en montos o en la conciliación de dinero.
 
-SIDI es una aplicación web local (Node.js + Express + SQLite) que se instala en Windows sin Node ni permisos de administrador. Importa el Excel de grupos, los CV en PDF, las encuestas OPINA y el reporte de contratos; calcula descuentos con la tarifa de cada tipo de clase; propone suplentes sin choque de horario; genera los dos Excel de Nacional sobre su plantilla original y prepara el correo en Outlook. Tiene **267 pruebas automáticas en verde**, responde en **menos de 6 ms** (p95) en búsquedas y genera ambos Excel en **menos de 12 ms**.
+SIDI es una aplicación web local (Node.js + Express + SQLite) que se instala en Windows sin Node ni permisos de administrador. Importa el Excel de grupos, los CV en PDF, las encuestas OPINA y el reporte de contratos; calcula descuentos con la tarifa de cada tipo de clase; propone suplentes sin choque de horario; genera los dos Excel de Nacional sobre su plantilla original y prepara el correo en Outlook. Tiene **270 pruebas automáticas en verde**, responde en **menos de 6 ms** (p95) en búsquedas y genera ambos Excel en **menos de 12 ms**.
 
 **Decisión que pedimos:** usar SIDI en paralelo al proceso manual en las quincenas **Q23 y Q24** (diciembre de 2026), medir el tiempo y los errores de ambos, y adoptarlo como proceso oficial en enero de 2027 si el resultado confirma la mejora (§7.4).
 
@@ -56,7 +58,7 @@ Anexo A. Cumplimiento de las rúbricas
 | 3 sprints de 15 días hábiles (03/11 → 24/11/2026), con revisión del cliente el 29/10 | `context/Sprints.md`, milestones de GitHub |
 | Requerimientos funcionales (RF-01 a RF-29) y no funcionales (RNF-01 a RNF-08) | `context/01_Requerimientos_Tecnicos.md` |
 | Modelo de datos, arquitectura, especificación de la API y formatos de Excel | `context/03` a `context/07` |
-| Flujo Git: `main ← develop ← feature/*`, un PR diario por integrante, solo el Scrum Master fusiona | 44 PR fusionados, 129 commits |
+| Flujo Git: `main ← develop ← feature/*`, un PR diario por integrante, solo el Scrum Master fusiona | 45 PR fusionados, 134 commits en `develop` |
 
 **El problema.** La Coordinación de Docentes de la Preparatoria campus Veracruz administra a 47 docentes de Bachillerato General y Bilingüe. Cada quincena envía a Nacional dos archivos de Excel con formato fijo: `DESCUENTO-PREPA Qnn.xlsx` (faltas a descontar) e `INCIDENCIAS PREPA Qnn.xlsx` (pagos adicionales y pagos a suplentes, con una hoja de conciliación). La información para llenarlos estaba repartida en el Excel de grupos del semestre, los CV en PDF y los contratos de cada grupo (CRN), y la consulta de perfiles docentes se hacía archivo por archivo.
 
@@ -64,18 +66,18 @@ Anexo A. Cumplimiento de las rúbricas
 
 ## 2. Arquitectura de la aplicación
 
-**SIDI es una sola aplicación Node.js que sirve la API y las páginas desde la computadora de la coordinación; los datos viven en un archivo SQLite local y nunca salen a internet.**
+**SIDI es una sola aplicación Node.js que sirve la API y las páginas desde la computadora de la coordinación; en la versión instalada, Electron la abre en una ventana propia. Los datos viven en un archivo SQLite local y nunca salen a internet.**
 
 ![Figura 1. Arquitectura de SIDI](img/00_arquitectura.png)
 *Figura 1. Arquitectura por capas. Conclusión: cada capa tiene una responsabilidad (vista, ruta, regla de negocio, formato, almacenamiento), lo que permitió que cuatro personas trabajaran en paralelo con conflictos mínimos.*
 
 | Capa | Tecnología | Responsabilidad | Tamaño |
 |---|---|---|---|
-| Vista | HTML, CSS y JavaScript sin frameworks (módulos IIFE), gráficas propias en HTML/CSS | 9 vistas, navegación por `#hash`, tema claro/oscuro y color elegible | 17 módulos JS, 8,138 líneas |
-| Servidor | Node.js 22 + Express 4 | Cabeceras de seguridad, JSON ≤ 1 MB, errores centralizados | `server.js` |
+| Vista | HTML, CSS y JavaScript sin frameworks (módulos IIFE), gráficas propias en HTML/CSS | 9 vistas, navegación por `#hash`, tema claro/oscuro y color elegible | 17 módulos JS (6,848 líneas), 1,231 de CSS y 98 de HTML |
+| Servidor | Node.js + Express 4; Electron 42 en la app instalada | Cabeceras de seguridad, JSON ≤ 1 MB, errores centralizados; en la app, Electron arranca este servidor en `127.0.0.1` y un puerto libre | `server.js`, `electron/main.js` |
 | Rutas | Express Router | Validan la entrada y responden; no tienen SQL | 16 archivos, 690 líneas |
-| Servicios | JavaScript (CommonJS) | Reglas de negocio: descuentos, suplencias, empalmes, reportes, analítica | 29 archivos, 5,156 líneas |
-| Utilidades | SheetJS, JSZip, pdf-parse | Lectores (Excel de grupos, OPINA, contratos, CV) y generadores (Excel de Nacional, correo `.eml`) | 3,402 líneas |
+| Servicios | JavaScript (CommonJS) | Reglas de negocio: descuentos, suplencias, empalmes, reportes, analítica | 29 archivos, 5,187 líneas |
+| Utilidades | SheetJS, JSZip, pdf-parse | Lectores (Excel de grupos, OPINA, contratos, CV) y generadores (Excel de Nacional, correo `.eml`) | 29 archivos JS (3,062 líneas) y 3 migraciones SQL (428 líneas) |
 | Datos | SQLite (`better-sqlite3`), modo WAL, llaves foráneas activas | 22 tablas, 5 vistas, 14 índices, migraciones versionadas | 1 archivo |
 
 ![Figura 2. Modelo de datos](img/00_modelo_datos.png)
@@ -99,7 +101,7 @@ Decisiones de modelo que sostienen las reglas del cliente:
 |---|---|---|---|
 | Panel | KPIs de la quincena, OPINA por maestro, docentes por nivel y estudios, faltas por motivo, cumpleaños, avisos | HU-15 | Lee faltas, suplencias, OPINA y docentes |
 | Docentes | Tabla paginada con pestañas Todos/Activos/Inactivos/Datos incompletos, búsqueda por nombre, CURP, nómina o CRN, filtros, ficha completa, alta, baja con motivo y "recontratable", carga de Excel de grupos y de CV | HU-01 a HU-07, HU-19, HU-20, HU-21 | Sus grupos y horarios alimentan Faltas; su OPINA, el Panel |
-| Faltas | Registrar falta por día y CRN con descuento automático, justificación IMSS, 2ª sesión, descuento manual; grupos a suplir y docentes disponibles sin empalme; suplente con su contrato | HU-09, HU-10, HU-22 | Crea la incidencia del suplente; queda pendiente para Reportes |
+| Faltas | Registrar falta por día y CRN como No justificada (se descuenta) o Justificada (incapacidad IMSS, cita IMSS o viaje escolar: no se descuenta), siempre 8 horas = 1 día; 2ª sesión; descuento manual; grupos a suplir y docentes disponibles sin empalme; suplente con su contrato capturado a mano | HU-09, HU-10, HU-22 | Crea la incidencia del suplente; queda pendiente para Reportes |
 | Incidencias | Pagos adicionales (tutoreo, PAD, coach, talleres), importe por periodo, copiar de la quincena anterior, orden del Excel | HU-11 | Entra al Excel de Incidencias |
 | OPINA | Ranking completo con filtros (mejores/peores N, rango de %), comparativo entre semestres, % OPP del campus, exportar a Excel, importación con vista previa | HU-08, HU-16, HU-24 | Alimenta Panel, ficha y Resumen ejecutivo |
 | Reportes | Avisos antes de descargar con botón *Corregir*, `DESCUENTO-PREPA Qnn.xlsx` e `INCIDENCIAS PREPA Qnn.xlsx`, cierre de quincena, borrador de Outlook con los dos adjuntos, inasistencias por semestre | HU-12, HU-13, HU-14, HU-25 | Toma las faltas e incidencias pendientes y las asigna a la quincena |
@@ -113,8 +115,8 @@ Decisiones de modelo que sostienen las reglas del cliente:
 ### 3.1 El flujo principal, paso a paso
 
 1. **Importar con vista previa.** Al subir el Excel de grupos, SIDI muestra cuántos docentes y grupos son nuevos, cuáles cambian, cuáles ya no vienen y qué avisos hay (grupos en línea F61/F62 que se omiten, docentes no recontratables, grupos sin contrato). Nada se guarda sin confirmar (Figura 4).
-2. **Registrar la falta.** Al elegir docente y día, SIDI propone los CRN que el docente tiene ese día según su horario y calcula el descuento con la tarifa del tipo de clase ($54, $65, $90…). Una falta con incapacidad o cita del IMSS se registra con descuento $0 y folio (Figura 5).
-3. **Elegir suplente.** Para cada grupo a suplir, SIDI lista los docentes activos sin clase que se empalme ese día, ordenados por: misma materia → ya da clase ese día → menos suplencias en el semestre. Al elegir, se crea su pago en Incidencias y se agrupan los días del mismo CRN ("del 1 al 4 de septiembre, a pagar 4 días").
+2. **Registrar la falta.** Al elegir docente y día, SIDI propone los CRN que el docente tiene ese día según su horario y calcula el descuento con la tarifa del tipo de clase ($54, $65, $90…). Toda falta cuenta como 8 horas = 1 día completo. Si es Justificada (incapacidad o cita del IMSS con folio, o viaje escolar), el descuento es $0 (Figuras 5 y 5b).
+3. **Elegir suplente.** Para cada grupo a suplir, SIDI lista los docentes activos sin clase que se empalme ese día, ordenados por: misma materia → ya da clase ese día → menos suplencias en el semestre. Al elegir, se crea su pago en Incidencias y se agrupan los días del mismo CRN ("del 1 al 4 de septiembre, a pagar 4 días"). El contrato del suplente no viene en ningún archivo: SIDI propone el de sus grupos y la coordinadora puede escribir otro.
 4. **Revisar avisos y descargar.** Reportes valida antes de generar (CRN sin contrato, contrato que ya no pertenece al suplente, faltas fuera de corte) y cada aviso abre el registro a corregir (Figura 6).
 5. **Enviar.** SIDI arma un borrador de Outlook (`.eml`) con los dos Excel adjuntos y los tres destinatarios de Nacional; la coordinadora revisa y presiona *Enviar*.
 
@@ -124,6 +126,9 @@ Decisiones de modelo que sostienen las reglas del cliente:
 ![Figura 5. Registrar falta](img/11_registrar_falta.png)
 *Figura 5. Registrar falta con grupos a suplir y docentes disponibles. Conclusión: tres faltas, su descuento ($162.00) y los candidatos a suplir salen de una sola pantalla.*
 
+![Figura 5b. Falta justificada](img/11b_falta_justificada.png)
+*Figura 5b. Motivo Justificada con la opción Viaje escolar, agregada en la versión 1.0.2 tras la sesión con la cliente. Conclusión: no se descuenta, pero el suplente sí cobra la tarifa del día.*
+
 ![Figura 6. Reportes de Nacional](img/07_reportes.png)
 *Figura 6. Reportes de la quincena Q22. Conclusión: antes de descargar, SIDI resume qué entra (9 faltas, $590.00) y si hay algo que corregir.*
 
@@ -131,6 +136,9 @@ Decisiones de modelo que sostienen las reglas del cliente:
 
 ![Figura 7. DESCUENTO-PREPA generado](img/19_excel_descuentos.png)
 *Figura 7. `DESCUENTO-PREPA Q22.xlsx` generado con datos de demostración: una fila por CRN y día, comentario armado con horas y tarifa, y la fila de total que faltaba en 2 de los 5 originales.*
+
+![Figura 7b. Hoja Incidencia generada](img/20_excel_incidencias.png)
+*Figura 7b. Hoja `Incidencia` generada: `Tabla17` redimensionada a las filas de la quincena, con la fórmula del importe por periodo.*
 
 ![Figura 8. Hoja detalle generada](img/21_excel_detalle.png)
 *Figura 8. Hoja `detalle` de Incidencias: descontado, pagado a suplentes y diferencia por docente. Conclusión: las faltas IMSS quedan con $0 descontado, el error que tenían Q17 y Q19.*
@@ -153,13 +161,16 @@ Decisiones de modelo que sostienen las reglas del cliente:
 ![Figura 9. Panel en modo oscuro con otro color](img/12_panel_oscuro.png)
 *Figura 9. El mismo Panel en modo oscuro y color azul marino. Conclusión: el tema cambia los acentos, no los colores de estado.*
 
+![Figura 9b. Docentes en tableta](img/13_tableta.png)
+*Figura 9b. Docentes en una tableta (820 px de ancho). Conclusión: la tabla se adapta sin perder las columnas clave (RNF-06).*
+
 ---
 
 ## 4. Fundamentación cuantitativa de las decisiones de diseño
 
 **Comparamos al menos dos alternativas en cada decisión de arquitectura con números propios, y elegimos la que cumple los requisitos con menos instalación, menos dependencias y menor riesgo para el formato de Nacional.**
 
-Supuestos comunes: 1 usuaria a la vez en 1 computadora Windows; 47 docentes y unos 145 CRN por semestre; entre 3,716 y 4,033 respuestas OPINA por semestre (archivos reales de 2024–2026); 2 reportes por quincena (24 quincenas al año). Mediciones en un equipo Linux de pruebas (Node 22.23) con la base de demostración; en la computadora de la coordinadora los tiempos absolutos pueden variar.
+Supuestos comunes: 1 usuaria a la vez en 1 computadora Windows; 47 docentes y unos 145 CRN por semestre; entre 3,716 y 4,033 respuestas OPINA por semestre (archivos reales de 2024–2026); 2 reportes por quincena (24 quincenas al año). Mediciones en un equipo Linux de pruebas (Node 22.23) con la base de demostración, sobre el commit `800e561` (v1.0.1); en la computadora de la coordinadora los tiempos absolutos pueden variar.
 
 ### 4.1 Base de datos
 
@@ -215,13 +226,13 @@ La tarifa por día sale de **horas por semana + idioma** del CRN (por ejemplo, 3
 
 ## 5. Pruebas: resultados, errores encontrados y cómo se corrigieron
 
-**La versión evaluada pasa 267 de 267 pruebas automáticas; cada error que encontramos durante el desarrollo quedó con una prueba que lo reproduce, para que no regrese.**
+**La versión evaluada pasa 270 de 270 pruebas automáticas; cada error que encontramos durante el desarrollo quedó con una prueba que lo reproduce, para que no regrese.**
 
 ### 5.1 Estrategia
 
 | Tipo de prueba | Cómo se hizo | Resultado |
 |---|---|---|
-| Unitarias y de servicio | `node:test` con bases SQLite en memoria y archivos ficticios (CV en PDF generados, Excel de grupos y OPINA anonimizados) | **267 / 267** en 15 s |
+| Unitarias y de servicio | `node:test` con bases SQLite en memoria y archivos ficticios (CV en PDF generados, Excel de grupos y OPINA anonimizados) | **270 / 270** en 12 s |
 | Punta a punta por HTTP | Base de demostración (`scripts/demo.js`): 20 docentes, 42 grupos, 494 respuestas OPINA, 28 faltas, 7 suplencias | Todas las vistas cargan; Excel generados y abiertos |
 | Fidelidad de formato | Excel generados abiertos y comparados con la plantilla; script `scripts/comparar-reportes.js` para comparar contra los originales Q16–Q20 en la computadora del cliente | Estructura correcta (Tabla17 `A2:N6`, fila de total, sin vínculos). La comparación con los originales Q16–Q20 la hace la Product Owner en la computadora que tiene los archivos reales, que no salen de ahí |
 | Seguridad | Pruebas manuales de inyección SQL, XSS, tipo y tamaño de archivo, JSON inválido, cabeceras y dirección de escucha (§6) | Todas bloqueadas |
@@ -234,9 +245,9 @@ La tarifa por día sale de **horas por semana + idioma** del CRN (por ejemplo, 3
 *Figura 10b. Validación del borrador `.eml` generado por SIDI.*
 
 ![Figura 10. Resultado de npm test](img/24_pruebas_npm_test.png)
-*Figura 10. 267 pruebas en 38 archivos, agrupadas por área. Conclusión: las reglas que mueven dinero (faltas, suplencias, reportes) tienen 62 pruebas.*
+*Figura 10. 270 pruebas en 38 archivos, agrupadas por área. Conclusión: las reglas que mueven dinero (faltas, suplencias, reportes) tienen 65 pruebas.*
 
-El número de pruebas creció con el proyecto: 111 al 12/11, 258 en la revisión de cierre del 19/11 y 267 en la versión final.
+El número de pruebas creció con el proyecto: 111 al 12/11, 258 en la revisión de cierre del 19/11, 267 en la versión 1.0.1 y 270 en la 1.0.2.
 
 ### 5.2 Errores encontrados y su corrección
 
@@ -284,7 +295,7 @@ Para cada error volvimos a la versión anterior a la corrección, corrimos la pr
 
 **E5 · La descarga de ambos Excel fallaba con error 422 después de reimportar contratos (19/11/2026).**
 
-*Síntoma:* si después de registrar una suplencia se reimportaban grupos o contratos, el contrato guardado en el pago del suplente podía dejar de ser suyo y la generación de los dos Excel se detenía. *Acción:* al generar se usa el contrato vigente del suplente, y Reportes muestra el aviso "El contrato guardado ya no es del suplente" con botón *Corregir* que abre el registro (commit `f787b1b`).
+*Síntoma:* si después de registrar una suplencia se reimportaban grupos o contratos, el contrato guardado en el pago del suplente podía dejar de ser suyo y la generación de los dos Excel se detenía. *Acción:* al generar se usa el contrato vigente del suplente, y Reportes muestra el aviso "El contrato guardado ya no es del suplente" con botón *Corregir* que abre el registro (commit `f787b1b`). *Actualización v1.0.2 (26/11):* tras la sesión con la cliente, el contrato del suplente se captura a mano (SIDI propone el de sus grupos y acepta cualquier número), así que este aviso ya no aparece.
 
 ![E5 antes](img/E5_contrato_suplente_antes.png)
 *E5 · antes: no hay aviso y la generación se detiene.*
@@ -319,7 +330,7 @@ El navegador registra un 404 en la consola. No afecta el uso. *Acción propuesta
 ![E8](img/E8_favicon.png)
 *E8 · consola del navegador.*
 
-**Corregidos en la versión 1.0.1 del instalador (23/11/2026):** filtros duplicados en Docentes y vista semanal de horarios recortada (notas de la versión en GitHub).
+**Corregidos en las versiones del instalador (notas en GitHub):** 1.0.1, filtros duplicados en Docentes y vista semanal de horarios recortada; 1.0.2, los cambios pedidos por la cliente en Faltas (§8, restricción 8); 1.0.3 (27/11), la caja del folio IMSS al registrar una falta justificada.
 
 ---
 
@@ -391,15 +402,15 @@ El navegador registra un 404 en la consola. No afecta el uso. *Acción propuesta
 
 | Riesgo nuevo | Control |
 |---|---|
-| Un error de SIDI se repetiría en todas las quincenas (antes el error era aislado) | 267 pruebas, avisos antes de descargar y monto editable con marca |
-| Pérdida del archivo de base de datos | Respaldo de un archivo con `db.backup`; datos del instalador en AppData, que sobreviven a actualizar o desinstalar |
+| Un error de SIDI se repetiría en todas las quincenas (antes el error era aislado) | 270 pruebas, avisos antes de descargar y monto editable con marca |
+| Pérdida del archivo de base de datos | Respaldo de un archivo con `db.backup`; datos de la app en `%APPDATA%\SIDI\data`, que sobreviven a actualizar o desinstalar |
 | Confiar en la lectura automática del CV | Vista previa editable; nada se guarda sin confirmar |
 
 ### 7.4 Resultados por esfera
 
 | Esfera | Resultado | ¿Medición o estimación? |
 |---|---|---|
-| **Técnica** | 267/267 pruebas; búsqueda < 6 ms (p95) frente a la meta de 500 ms; OPINA de 4,000 filas en 0.35 s frente a 10 s; ambos Excel en < 12 ms; 0 vínculos externos | **Medición** (§4.5, §5) |
+| **Técnica** | 270/270 pruebas; búsqueda < 6 ms (p95) frente a la meta de 500 ms; OPINA de 4,000 filas en 0.35 s frente a 10 s; ambos Excel en < 12 ms; 0 vínculos externos | **Medición** (§4.5, §5) |
 | **Organizacional** | Las 9 reglas que originaron las 24 inconsistencias de la línea base ahora están automatizadas y probadas; la regla de tarifas coincide con lo cobrado en 41 de 43 CRN | **Medición** sobre pruebas y archivos reales. La reducción de errores en operación real se medirá en Q23–Q24 |
 | **Organizacional** | Tiempo de preparación del reporte: ≈ 1 semana por quincena con el proceso manual (según la coordinadora) → con SIDI, la captura de cada falta toma una pantalla y los dos Excel se generan en milisegundos; el tiempo real se cronometrará en Q23. Escenario: si la preparación baja a 1 día hábil, se liberan ≈ 4 días hábiles por quincena, ≈ 96 al año (24 quincenas) | **Estimación**: la línea base es la estimación de la coordinadora y el escenario supone 5 días hábiles de trabajo efectivo por semana; se confirmará con la medición de Q23–Q24 |
 | **Social** | Docentes y suplentes reciben descuentos y pagos calculados con la misma regla; las faltas IMSS ya no se reportan como descontadas | **Medición** en pruebas; el efecto sobre reclamaciones no se ha medido |
@@ -411,7 +422,7 @@ El navegador registra un 404 en la consola. No afecta el uso. *Acción propuesta
 
 ## 8. Riesgos y responsabilidad profesional
 
-**Identificamos por iniciativa propia siete restricciones; en cada una cambiamos un requisito, aceptamos un compromiso técnico y dejamos claro quién asume el riesgo.**
+**Identificamos ocho restricciones; en cada una cambiamos un requisito, aceptamos un compromiso técnico y dejamos claro quién asume el riesgo.**
 
 | # | Restricción | Requisito modificado | Compromiso aceptado | Quién asume el riesgo |
 |---|---|---|---|---|
@@ -421,7 +432,8 @@ El navegador registra un 404 en la consola. No afecta el uso. *Acción propuesta
 | 4 | El contrato por CRN no viene en ningún archivo | Plantilla prellenada de contratos (HU-27) y captura al registrar la primera falta | Trabajo inicial de la coordinadora al inicio de semestre | Coordinadora y RH |
 | 5 | Datos personales en CV, OPINA y nómina | Minimización de campos; nada real en GitHub | Algunos datos del CV se capturan a mano si se necesitan | Equipo (desarrollo) y coordinación (operación) |
 | 6 | Plazo de 15 días hábiles y 7 historias nuevas a mitad del proyecto | Las 3 historias de menor urgencia (13 pts: comparativo del campus, correo y resumen ejecutivo) pasaron a un Sprint 3 de una semana | Lo que se usa cada quincena se entregó primero; lo demás llegó al final | Scrum Master (decidió) y Product Owner (validó con el cliente) |
-| 7 | Equipo de 4 personas para 27 historias | Una sola persona llevó backend y frontend; el Scrum Master revisó e integró cada PR | Más carga en el desarrollo y en la revisión | Desarrollador (Matías) y Scrum Master |
+| 7 | Sebastián (frontend) salió del proyecto | El Scrum Master asumió el frontend además de revisar e integrar cada PR | Más carga en revisión e integración | Scrum Master |
+| 8 | Nuevos pedidos de la cliente en la sesión de cierre (26/11): motivo Justificada/No justificada, viaje escolar, siempre 8 horas y contrato del suplente a mano | Versión 1.0.2 después del Sprint 3; la migración 003 reconstruye la tabla de faltas conservando los datos | Cambio de esquema en bases ya instaladas | Scrum Master (implementó) y Product Owner (validó con la cliente) |
 
 **Responsabilidad profesional en la práctica:** ningún archivo real del cliente se subió al repositorio; los datos de demostración son ficticios con CURP inventadas; cada corrección se acompañó de una prueba que demuestra que el error existía; y las limitaciones conocidas (E7, E8, `body-parser`, instalador sin firma, pruebas pendientes con datos reales) se declaran en este reporte en lugar de omitirse.
 
@@ -433,9 +445,9 @@ El navegador registra un 404 en la consola. No afecta el uso. *Acción propuesta
 
 ### 9.1 Instalación en la computadora de la coordinación (producción)
 
-1. Descargar el instalador de la versión más reciente (v1.0.1) desde *Releases* del repositorio.
+1. Descargar el instalador de la versión más reciente (1.0.3) desde *Releases* del repositorio.
 2. Ejecutarlo. Si Windows SmartScreen avisa que el instalador no está firmado: *Más información* → *Ejecutar de todas formas*.
-3. Abrir SIDI desde el acceso directo. Los datos se guardan en la carpeta de la aplicación dentro de **AppData** y se conservan al actualizar o desinstalar.
+3. Abrir SIDI desde el escritorio o el menú Inicio: se abre en su propia ventana, sin navegador ni consola. Los datos se guardan en `%APPDATA%\SIDI\data` y se conservan al actualizar, reinstalar o desinstalar; para abrir esa carpeta: tecla **Alt** → **SIDI** → **Abrir carpeta de datos**.
 4. Requisitos: Windows 10 u 11 de 64 bits.
 
 ### 9.2 Instalación desde el código (desarrollo)
@@ -446,8 +458,9 @@ cd SIDI-Sistema-Integral-de-Informacion-Docente
 npm install                 # Node.js 20 o superior (recomendado 22 LTS)
 cp .env.example .env        # Windows: copy .env.example .env
 npm start                   # http://localhost:3000
-npm test                    # 267 pruebas
+npm test                    # 270 pruebas
 node scripts/demo.js        # base de demostración en data/demo.db
+npm run dist                # instalador dist/SIDI-Setup-<versión>.exe (requiere NSIS)
 ```
 
 ### 9.3 Optimizaciones realizadas
@@ -462,7 +475,8 @@ node scripts/demo.js        # base de demostración en data/demo.db
 | Archivos subidos en memoria, con límites de tamaño | No quedan archivos temporales con datos personales |
 | Frontend sin frameworks ni paso de compilación; gráficas propias | Sin dependencias de internet; carga inmediata |
 | `theme.js` aplica el tema antes de pintar | Sin parpadeo al cambiar a modo oscuro |
-| Migraciones versionadas (`schema_migrations`) | Actualizar el instalador no borra datos |
+| Migraciones versionadas (`schema_migrations`) | Actualizar el instalador no borra datos (la 003 reconstruye `faltas` conservando ids y suplencias) |
+| App de escritorio en un puerto libre y una sola instancia | No choca con otro programa que use el puerto 3000; abrir SIDI dos veces enfoca la ventana existente |
 
 ---
 
@@ -478,9 +492,9 @@ node scripts/demo.js        # base de demostración en data/demo.db
 ### 10.2 Metodológicas
 
 - **Mostrar pronto al cliente cambia el backlog para bien.** La revisión del 29/10 aprobó el diseño y agregó 7 historias (de 108 a 134 puntos); el Scrum Master las ordenó para que las de menor riesgo entraran a los Sprints 1 y 2 y el resto a un Sprint 3.
-- **Un solo responsable de fusionar da orden, pero concentra carga.** Con 44 PR revisados por una persona, apilar ramas del mismo día obligó a rehacer cadenas de PR contra `develop`; aprendimos a abrir PR pequeños y a declarar sus dependencias en la descripción.
+- **Un solo responsable de fusionar da orden, pero concentra carga.** Con 45 PR revisados por una persona, apilar ramas del mismo día obligó a rehacer cadenas de PR contra `develop`; aprendimos a abrir PR pequeños y a declarar sus dependencias en la descripción.
 - **La definición de terminado debe incluir el dato real.** Dos criterios (comparar con Q16–Q20 y probar el `.eml` en el Outlook de la coordinadora) dependen de la computadora del cliente y quedaron para el cierre; debieron agendarse desde el inicio del sprint.
-- **Documentar primero permite repartir el trabajo.** Con requerimientos, modelo de datos, API y tareas por persona escritos en `context/`, una misma persona pudo llevar backend y frontend sin perder historias.
+- **Documentar primero permite absorber cambios en el equipo.** Como todo estaba documentado en `context/` (requerimientos, modelo de datos, API y tareas por persona), el Scrum Master pudo absorber el frontend cuando salió un integrante, sin perder historias.
 
 ### 10.3 Cómo mejora la eficiencia operativa de la coordinación
 
@@ -496,9 +510,9 @@ SIDI ataca los tres puntos donde se iba el tiempo y aparecían errores: **calcul
 | Alta | `npm audit fix` (body-parser ≥ 1.20.9), quitar `bcryptjs` y `jsonwebtoken` (sin uso) y renombrar el paquete a `sidi` | Cierra la vulnerabilidad conocida y reduce la superficie de dependencias |
 | Alta | Selector de "semestre actual" en Configuración | Hoy se marca con `PUT /api/periodos/:id`; la coordinadora lo necesita al inicio de cada semestre |
 | Alta | Guardar `xlsx-0.20.3.tgz` en el repositorio | Instalación desde el código sin depender del CDN (E7) |
-| Media | Botón "Descargar respaldo" con aviso de datos personales, y recordatorio periódico de respaldo | Hoy el respaldo se descarga desde `/api/respaldo` |
+| Media | Botón "Descargar respaldo" con aviso de datos personales, y recordatorio periódico de respaldo | Hoy se copia la carpeta de datos (Alt → SIDI → Abrir carpeta de datos) o se usa `/api/respaldo` en desarrollo |
 | Media | Firmar el instalador | Quitar la advertencia de SmartScreen |
-| Media | Migración `003` que borre las tablas `usuarios` y `notas` heredadas de la plantilla | Limpieza del esquema en bases existentes |
+| Media | Migración `004` que borre las tablas `usuarios` y `notas` heredadas de la plantilla | Limpieza del esquema en bases existentes |
 | Media | Recuperar el selector de columnas de la tabla de docentes (HU-03) como opción | Se sustituyó por la ficha completa en el rediseño |
 | Baja | `favicon.ico` (E8) | Pulido |
 | Expansión | Envío directo con Microsoft Graph si TI lo autoriza | Elimina el clic manual del correo |
@@ -512,7 +526,7 @@ SIDI ataca los tres puntos donde se iba el tiempo y aparecían errores: **calcul
 
 Cámara de Diputados del H. Congreso de la Unión. (2025, 20 de marzo). *Ley Federal de Protección de Datos Personales en Posesión de los Particulares*. Diario Oficial de la Federación. https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPDPPP.pdf
 
-Galeana Medrano, C. I., Hernández Garrido, M., García Duarte, U. A., y Cecilio Rascón, S. (2026). *SIDI: Sistema Integral de Información Docente* [Software y documentación]. GitHub. https://github.com/CalixtoIsaac/SIDI-Sistema-Integral-de-Informacion-Docente
+Galeana Medrano, C. I., Hernández Garrido, M., García Duarte, U. A., Cecilio Rascón, S., y Huesca Ramírez, S. (2026). *SIDI: Sistema Integral de Información Docente* [Software y documentación]. GitHub. https://github.com/CalixtoIsaac/SIDI-Sistema-Integral-de-Informacion-Docente
 
 Microsoft Exchange Team. (2026, 27 de enero). *Updated Exchange Online SMTP AUTH Basic Authentication deprecation timeline*. Microsoft Tech Community. https://techcommunity.microsoft.com/blog/exchange/updated-exchange-online-smtp-auth-basic-authentication-deprecation-timeline/4489835
 
@@ -531,7 +545,7 @@ OWASP Foundation. (2025b). *OWASP Top 10:2025*. https://owasp.org/Top10/2025/
 | Vinculación con materia o certificado | 10 % | Portada y §1 (Metodologías Ágiles) |
 | Fundamentación cuantitativa | 20 % | §4: tres decisiones con alternativas, unidades, supuestos, incertidumbre y límites; §4.5 metas vs. mediciones |
 | Innovación y mejora propuesta | 15 % | §7.1 línea base (24 inconsistencias) y meta; §7.2 dos alternativas; §7.3 riesgo introducido y control |
-| Riesgos y responsabilidad profesional | 15 % | §8: siete restricciones con requisito, compromiso y responsable |
+| Riesgos y responsabilidad profesional | 15 % | §8: ocho restricciones con requisito, compromiso y responsable |
 | Impacto respaldado por resultados | 20 % | §7.4: dato técnico, organizacional y social/ambiental, con medición o estimación declarada |
 | Seguridad, privacidad y uso de datos | 10 % | §6: activo → riesgo → control → referente → verificación, y riesgo residual |
 | Comunicación visual de resultados | 10 % | Cada figura lleva su conclusión; secuencia problema → solución → evidencia → decisión; decisión solicitada en el Resumen y §7.4 |
@@ -540,7 +554,7 @@ OWASP Foundation. (2025b). *OWASP Top 10:2025*. https://owasp.org/Top10/2025/
 
 | Criterio | Dónde se cumple |
 |---|---|
-| 1. Prototipo funcional | §3 (27 historias en 9 vistas), §5 (267 pruebas) y *Manual de usuario* |
+| 1. Prototipo funcional | §3 (27 historias en 9 vistas), §5 (270 pruebas) y *Manual de usuario* |
 | 2. Interfaz de usuario | §3.3 decisiones de UI/UX justificadas; capturas en el *Manual de usuario* |
 | 3. Integración y manejo de datos | §2 modelo de datos, §4.1, §9.3 transacciones e índices |
 | 4. Pruebas y validación | §5 (resultados, 8 errores con capturas y acción), §6 (seguridad), revisión de usabilidad |
