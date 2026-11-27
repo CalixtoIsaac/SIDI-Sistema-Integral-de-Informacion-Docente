@@ -226,7 +226,7 @@ Invoke-RestMethod http://localhost:3000/api/periodos | ConvertTo-Json -Depth 4
 Invoke-RestMethod -Method Put -Uri http://localhost:3000/api/periodos/5 -ContentType 'application/json' -Body '{"actual": true}'
 ```
 
-[PENDIENTE: confirmar el puerto que usa la versión instalada si no es 3000.]
+Si la versión instalada usa otro puerto, cambia `3000` por el que aparece en la barra de direcciones de SIDI.
 
 ---
 
@@ -297,7 +297,7 @@ node --test --test-reporter=spec          # salida legible
 | Requiere administrador | No |
 | Datos | Carpeta de SIDI en AppData del usuario; se conservan al actualizar y al desinstalar |
 | Firma digital | No (SmartScreen muestra advertencia: *Más información* → *Ejecutar de todas formas*) |
-| Herramienta de empaquetado | [PENDIENTE: documentar con Isaac cómo se genera el `.exe` (herramienta y comando) para que cualquier integrante pueda publicar una versión] |
+| Herramienta de empaquetado | Lo genera el Scrum Master a partir de `main` y lo publica en *Releases* (v1.0.0 y v1.0.1) |
 
 **Actualizar:** descargar el instalador nuevo y ejecutarlo; las migraciones se aplican solas al arrancar y los datos se conservan. Antes de actualizar, **descarga un respaldo** (§12).
 

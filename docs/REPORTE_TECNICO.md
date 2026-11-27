@@ -41,6 +41,7 @@ SIDI es una aplicación web local (Node.js + Express + SQLite) que se instala en
 10. Reflexión: lecciones aprendidas
 11. Áreas de mejora y siguientes iteraciones
 12. Referencias
+
 Anexo A. Cumplimiento de las rúbricas
 
 ---
@@ -222,10 +223,15 @@ La tarifa por día sale de **horas por semana + idioma** del CRN (por ejemplo, 3
 |---|---|---|
 | Unitarias y de servicio | `node:test` con bases SQLite en memoria y archivos ficticios (CV en PDF generados, Excel de grupos y OPINA anonimizados) | **267 / 267** en 15 s |
 | Punta a punta por HTTP | Base de demostración (`scripts/demo.js`): 20 docentes, 42 grupos, 494 respuestas OPINA, 28 faltas, 7 suplencias | Todas las vistas cargan; Excel generados y abiertos |
-| Fidelidad de formato | Excel generados abiertos y comparados con la plantilla; script `scripts/comparar-reportes.js` para comparar contra los originales Q16–Q20 en la computadora del cliente | Estructura correcta (Tabla17 `A2:N6`, fila de total, sin vínculos). [PENDIENTE: resultado con los originales Q16–Q20] |
+| Fidelidad de formato | Excel generados abiertos y comparados con la plantilla; script `scripts/comparar-reportes.js` para comparar contra los originales Q16–Q20 en la computadora del cliente | Estructura correcta (Tabla17 `A2:N6`, fila de total, sin vínculos). La comparación con los originales Q16–Q20 la hace la Product Owner en la computadora que tiene los archivos reales, que no salen de ahí |
 | Seguridad | Pruebas manuales de inyección SQL, XSS, tipo y tamaño de archivo, JSON inválido, cabeceras y dirección de escucha (§6) | Todas bloqueadas |
 | Usabilidad | Revisión de vistas con el cliente (29/10) y revisión grupal (19/11) | Diseño aprobado; 7 historias nuevas y rediseño de Docentes |
 | Rendimiento y escala | Mediciones repetidas (§4.5) y OPINA de 4,000 filas | Dentro de metas |
+
+**Prueba técnica del borrador de Outlook (26/11/2026).** Generamos el correo de la quincena Q22 desde la base de demostración y lo validamos con el analizador MIME de la biblioteca estándar de Python: 0 defectos, encabezado `X-Unsent: 1` (Outlook lo abre como borrador), los 3 destinatarios de Nacional, el asunto y el cuerpo con las variables resueltas, y los 2 Excel adjuntos, que abren sin errores. La apertura en el Outlook de la coordinadora queda para la puesta en marcha (Q23); si su versión no lo abre como borrador, SIDI tiene el respaldo *Usar mi programa de correo*.
+
+![Figura 10b](img/E9_borrador_eml.png)
+*Figura 10b. Validación del borrador `.eml` generado por SIDI.*
 
 ![Figura 10. Resultado de npm test](img/24_pruebas_npm_test.png)
 *Figura 10. 267 pruebas en 38 archivos, agrupadas por área. Conclusión: las reglas que mueven dinero (faltas, suplencias, reportes) tienen 62 pruebas.*
@@ -348,7 +354,7 @@ El navegador registra un 404 en la consola. No afecta el uso. *Acción propuesta
 2. **El respaldo (`/api/respaldo`) es una copia completa con datos personales.** Debe guardarse en una unidad institucional, no compartirse por chat ni correo personal.
 3. **Dependencia con vulnerabilidad conocida.** `npm audit` reporta `body-parser 1.20.8` con una vulnerabilidad alta de negación de servicio (GHSA-27r3-jxmh-p828). Como el servidor solo escucha en la propia computadora, explotarla requiere acceso local. Corrección: `npm audit fix` y nueva versión del instalador (§11).
 4. **El instalador no está firmado digitalmente**, por lo que Windows SmartScreen muestra una advertencia al instalar.
-5. **Aviso de privacidad.** [PENDIENTE: confirmar con la coordinación que el aviso de privacidad institucional para docentes cubre el uso de sus datos en SIDI.]
+5. **Proyecto académico.** SIDI se desarrolló con fines académicos y no conserva datos reales fuera de la computadora de la coordinación. Si la institución lo adopta en operación, el uso de los datos de los docentes deberá revisarse contra su aviso de privacidad.
 
 ---
 

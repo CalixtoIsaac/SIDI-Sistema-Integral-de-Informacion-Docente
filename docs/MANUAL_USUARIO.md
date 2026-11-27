@@ -324,7 +324,7 @@ Destinatarios (Para, CC, CCO separados por `;`), asunto y cuerpo. Puedes usar va
 
 Todo lo que capturas está en un solo archivo de base de datos. Para respaldarlo:
 
-1. Con SIDI abierto, escribe en la barra del navegador `http://localhost:3000/api/respaldo` [PENDIENTE: confirmar la dirección en la versión instalada] y presiona Enter.
+1. Con SIDI abierto, escribe en la barra de direcciones la misma dirección que ya aparece (por ejemplo `http://localhost:3000`) seguida de `/api/respaldo`, y presiona Enter.
 2. Se descarga `SIDI-respaldo-AAAA-MM-DD.db`.
 3. Guárdalo en una unidad institucional (OneDrive o carpeta de red de la escuela).
 
